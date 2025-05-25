@@ -7,15 +7,6 @@ import 'ui/orders/order_details_page.dart';
 import 'ui/payment/payment_gateway_page.dart';
 import 'ui/quotation/quotation_page.dart';
 import 'ui/services/commerce_services_page.dart';
-import 'ui/services/release_upload/release_upload_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_band_or_solo_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_genres_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_info_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_instr_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_itemlist_name_desc_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_name_desc_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_summary_page.dart';
-import 'ui/services/release_upload/widgets/release_upload_type_page.dart';
 import 'ui/stripe_checkout/stripe_webview_page.dart';
 
 class CommerceRoutes {
@@ -50,51 +41,6 @@ class CommerceRoutes {
       name: AppRouteConstants.quotation,
       page: () => const QuotationPage(),
       transition: Transition.leftToRight,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUpload,
-      page: () => const ReleaseUploadPage(),
-      transition: Transition.leftToRight,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadType,
-      page: () => const ReleaseUploadType(),
-      transition: Transition.zoom,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadBandOrSolo,
-      page: () => const ReleaseUploadBandOrSoloPage(),
-      transition: Transition.zoom,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadItemlistNameDesc,
-      page: () => const ReleaseUploadItemlistNameDescPage(),
-      transition: Transition.zoom,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadNameDesc,
-      page: () => const ReleaseUploadNameDescPage(),
-      transition: Transition.zoom,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadInstr,
-      page: () => const ReleaseUploadInstrPage(),
-      transition: Transition.zoom,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadGenres,
-      page: () => const ReleaseUploadGenresPage(),
-      transition: Transition.zoom,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadInfo,
-      page: () => const ReleaseUploadInfoPage(),
-      transition: Transition.zoom,
-    ),
-    GetPage(
-      name: AppRouteConstants.releaseUploadSummary,
-      page: () => const ReleaseUploadSummaryPage(),
-      transition: Transition.zoom,
     ),
     GetPage(
         name: AppRouteConstants.stripeWebView,

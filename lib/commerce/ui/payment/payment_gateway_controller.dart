@@ -19,7 +19,6 @@ import 'package:neom_commons/core/utils/enums/app_currency.dart';
 import 'package:neom_commons/core/utils/enums/product_type.dart';
 import 'package:neom_commons/core/utils/enums/user_role.dart';
 import 'package:neom_commons/core/utils/validator.dart';
-import 'package:neom_events/events/ui/event_details_controller.dart';
 
 import '../../../bank/data/implementations/app_bank_controller.dart';
 import '../../../bank/data/implementations/app_stripe_controller.dart';
@@ -294,35 +293,23 @@ class PaymentGatewayController extends GetxController with GetTickerProviderStat
 
         switch(order.product?.type) {
           case ProductType.event:
-            EventDetailsController eventDetailsController;
-
-            if (Get.isRegistered<EventDetailsController>()) {
-              eventDetailsController = Get.find<EventDetailsController>();
-            } else {
-              eventDetailsController = EventDetailsController();
-              Get.put(eventDetailsController);
-              await eventDetailsController.getEvent(order.product!.id);
-            }
-            await eventDetailsController.goingToEvent();
+            ///DEPRECATED
+            // EventDetailsController eventDetailsController;
+            //
+            // if (Get.isRegistered<EventDetailsController>()) {
+            //   eventDetailsController = Get.find<EventDetailsController>();
+            // } else {
+            //   eventDetailsController = EventDetailsController();
+            //   Get.put(eventDetailsController);
+            //   await eventDetailsController.getEvent(order.product!.id);
+            // }
+            // await eventDetailsController.goingToEvent();
 
             Get.toNamed(AppRouteConstants.splashScreen,
                 arguments: [AppRouteConstants.paymentGateway, AppRouteConstants.home]);
             break;
           case ProductType.appCoin:
             appBankController.addCoinsToWallet(user.id);
-            // try {
-            //   coinsQty = Get.find<WalletController>().appCoinProduct.value.qty;
-            //   AppUtilities.logger.d('$coinsQty from found WalletController');
-            // } catch(e) {
-            //   coinsQty = Get.put(WalletController()).appCoinProduct.value.qty;
-            //   AppUtilities.logger.d('$coinsQty from initiated WalletController');
-            // }
-
-            // ///ADD MONE TO USER WHY?
-            // if(await UserFirestore().addToWallet(user.id, coinsQty.toDouble())) {
-            //   userController.addToWallet(coinsQty);
-            // }
-
             Get.toNamed(AppRouteConstants.splashScreen,
                 arguments: [AppRouteConstants.paymentGateway, AppRouteConstants.wallet]);
             break;

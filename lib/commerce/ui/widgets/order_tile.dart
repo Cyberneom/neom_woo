@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:neom_commons/core/utils/enums/product_type.dart';
 import 'package:neom_commons/neom_commons.dart';
 import '../../domain/models/app_order.dart';
-import '../../utils/enums/transaction_type.dart';
 
 
 class OrderTile extends StatelessWidget {
