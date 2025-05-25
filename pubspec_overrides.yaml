@@ -1,6 +1,4 @@
 dependency_overrides:
-  neom_audio_player:
-    path: ../neom_audio_player
   neom_bands:
     path: ../neom_bands
   neom_commons:
