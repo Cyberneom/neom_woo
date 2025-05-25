@@ -15,8 +15,6 @@ class AppCommerceConstants {
     "event_cover_level_4": 200,
   };
 
-  static List<int> appReleaseItemsQty = List<int>.generate(15, (index) => index + 1);
-
   static const int trialPeriodDays = 30;
 
   static const String appBank = 'appBank';
