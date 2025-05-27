@@ -1,7 +1,6 @@
 import 'package:neom_commons/core/domain/model/address.dart';
 import 'package:neom_commons/core/domain/model/app_user.dart';
 import 'app_transaction.dart';
-import 'payment.dart';
 
 class Invoice {
 

@@ -1,7 +1,6 @@
 import 'package:enum_to_string/enum_to_string.dart';
 import 'package:neom_commons/core/utils/enums/app_currency.dart';
 import '../../utils/enums/wallet_status.dart';
-import 'app_transaction.dart';
 
 class Wallet {
 

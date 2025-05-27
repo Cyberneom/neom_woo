@@ -6,6 +6,8 @@ import 'package:neom_commons/core/utils/app_theme.dart';
 import 'package:neom_commons/core/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/core/utils/constants/app_translation_constants.dart';
 
+import '../../../commerce/domain/models/app_transaction.dart';
+import '../../../commerce/ui/widgets/transaction_tile.dart';
 import '../../../commerce/ui/widgets/wallet_widgets.dart';
 import 'wallet_card.dart';
 import 'wallet_controller.dart';
@@ -49,9 +51,24 @@ class WalletHistoryPage extends StatelessWidget {
                 Divider(thickness: 1, color: AppColor.white80),
                 SizedBox(
                   height: AppTheme.fullHeight(context)*0.7,
-                  child: _.orders.isNotEmpty ? buildOrderList(context, _)
-                      :  buildNoHistoryToShow(context, _),
+                  child: _.transactions.isNotEmpty ? ListView.builder(
+                      itemCount: _.transactions.length,
+                      itemBuilder: (context, index) {
+                        AppTransaction transaction = _.transactions.values.elementAt(index);
+                        return TransactionTile(transaction: transaction, walletId: _.wallet?.id ?? '',);
+                      }
+                  ) :  buildNoHistoryToShow(context, _),
                 ),
+                // SizedBox(
+                //   height: AppTheme.fullHeight(context)*0.7,
+                //   child: _.orders.isNotEmpty ? ListView.builder(
+                //       itemCount: _.orders.length,
+                //       itemBuilder: (context, index) {
+                //         AppOrder order = _.orders.values.elementAt(index);
+                //         return OrderTile(order: order);
+                //       }
+                //   ) :  buildNoHistoryToShow(context, _),
+                // ),
               ],
             ),
           ),

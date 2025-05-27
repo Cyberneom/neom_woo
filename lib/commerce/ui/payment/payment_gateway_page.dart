@@ -17,7 +17,6 @@ import 'package:neom_commons/core/utils/constants/app_translation_constants.dart
 import 'package:neom_commons/core/utils/constants/intl_countries_list.dart';
 import 'package:neom_commons/core/utils/constants/message_translation_constants.dart';
 import 'package:neom_commons/core/utils/core_utilities.dart';
-import 'package:neom_commons/core/utils/enums/app_currency.dart';
 import 'package:neom_commons/core/utils/enums/app_in_use.dart';
 import 'payment_gateway_controller.dart';
 
@@ -48,7 +47,7 @@ class PaymentGatewayPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text("${AppTranslationConstants.toPay.tr} ${CoreUtilities.getCurrencySymbol(_.transaction.currency ?? AppCurrency.appCoin)}"
+                    Text("${AppTranslationConstants.toPay.tr} ${CoreUtilities.getCurrencySymbol(_.transaction.currency)}"
                         "${_.transaction.amount} (${_.transaction.currency.name.toUpperCase()}) ${AppTranslationConstants.using.tr}",
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)
                     ),
@@ -85,7 +84,7 @@ class PaymentGatewayPage extends StatelessWidget {
                     Column(
                       children: [
                         SubmitButton(context, isEnabled: !_.isButtonDisabled.value, isLoading: _.isLoading.value,
-                        text: "${AppTranslationConstants.toPay.tr} ${CoreUtilities.getCurrencySymbol(_.transaction.currency ?? AppCurrency.appCoin)}"
+                        text: "${AppTranslationConstants.toPay.tr} ${CoreUtilities.getCurrencySymbol(_.transaction.currency)}"
                             "${_.transaction.amount} (${_.transaction.currency.name.toUpperCase()})",
                         onPressed: _.handleStripePayment,),
                         _.cardEditController.details.complete ? const SizedBox.shrink()

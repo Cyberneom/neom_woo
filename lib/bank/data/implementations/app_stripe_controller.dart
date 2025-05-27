@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
@@ -51,7 +51,6 @@ class AppStripeController {
 
   }
 
-  @override
   Future<void> handlePaymentMethod(AppTransaction transaction, BillingDetails billingDetails) async {
 
     PaymentMethod paymentMethod;
@@ -129,7 +128,6 @@ class AppStripeController {
 
   }
 
-  @override
   Future<Map<String, dynamic>> createPaymentIntent(String amount, String currency) async {
     AppUtilities.logger.d("Creating payment intent with amount: $amount and currency: $currency");
 
@@ -163,7 +161,6 @@ class AppStripeController {
     return {};
   }
 
-  @override
   Future<void> confirmIntent(String paymentIntentId) async {
     AppUtilities.logger.d("Confirming payment intent with id: $paymentIntentId");
 
@@ -176,7 +173,6 @@ class AppStripeController {
     }
   }
 
-  @override
   Future<Map<String, dynamic>> callNoWebhookPayEndpointIntentId({required String paymentIntentId,}) async {
     AppUtilities.logger.d("Calling no webhook pay endpoint with paymentIntentId: $paymentIntentId");
 

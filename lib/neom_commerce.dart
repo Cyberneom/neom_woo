@@ -1,4 +1,4 @@
-library neom_commerce;
+library;
 
 export 'commerce/commerce_routes.dart';
 export 'commerce/domain/models/payment.dart';

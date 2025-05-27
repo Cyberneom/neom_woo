@@ -11,15 +11,13 @@ import 'package:neom_commons/core/domain/model/user_subscription.dart';
 import 'package:neom_commons/core/utils/enums/subscription_level.dart';
 import 'package:neom_commons/core/utils/enums/subscription_status.dart';
 import 'package:neom_commons/core/utils/enums/verification_level.dart';
-
 import 'package:neom_commons/neom_commons.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../bank/data/transaction_firestore.dart';
+import '../../domain/models/app_order.dart';
 import '../../domain/models/app_product.dart';
 import '../../domain/models/app_transaction.dart';
-import '../../domain/models/payment.dart';
-import '../../domain/models/app_order.dart';
 import '../../utils/constants/app_commerce_constants.dart';
 import '../../utils/constants/stripe_webview_constants.dart';
 import '../../utils/enums/payment_status.dart';
@@ -226,7 +224,6 @@ class StripeViewController extends GetxController  {
     update([AppPageIdConstants.stripeWebView]);
   }
 
-  @override
   Future<void> createInternalPayment() async {
 
     if(order.id.isNotEmpty) {

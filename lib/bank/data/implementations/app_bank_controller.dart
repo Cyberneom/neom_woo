@@ -4,12 +4,12 @@ import 'package:get/get.dart';
 
 import 'package:neom_commons/core/utils/app_utilities.dart';
 import 'package:neom_commons/core/utils/constants/message_translation_constants.dart';
-import 'package:neom_commons/core/utils/validator.dart';
 
 import '../../../commerce/domain/models/app_transaction.dart';
 import '../../../commerce/domain/models/wallet.dart';
 import '../../../commerce/utils/enums/payment_status.dart';
-import '../../ui/wallet/wallet_controller.dart';
+import '../../../commerce/utils/enums/transaction_type.dart';
+import '../../utils/bank_constants.dart';
 import '../transaction_firestore.dart';
 import '../wallet_firestore.dart';
 
@@ -43,93 +43,62 @@ class AppBankController {
   }
 
   Future<bool> processTransaction(AppTransaction transaction) async {
-    AppUtilities.logger.t('Processing transaction: ${transaction.id}');
-
-    //TransactionFirestore insert
-    // transactiontStatus = TransactionStatus.processing;
+    AppUtilities.logger.d('Processing transaction: ${transaction.id}');
 
     try {
-      ///Validate and get coins from user wallet
-      if((wallet.balance >= (transaction?.amount ?? 0))) {
-
-        if(Validator.isEmail(transaction.recipientId ?? '')) {
-          ///Add coins to host wallet
-          // await payToUserWithCoins();
-        } else {
-          ///Add coins to bank in case there is no payment.to
-          //Verify Transaction created has appBank as recipientId
-          // await payToBank();
-        }
-        // transactiontStatus = TransactionStatus.completed;
-
-        //WalletFirestore processTransaction
-        WalletFirestore().addTransaction(transaction);
-
-        //TransactionFirestore insertTransaction
-
-
-      } else {
-        // transactiontStatus = TransactionStatus.failed;
-        // errorMsg = MessageTranslationConstants.notEnoughFundsMsg.tr;
+      if(BankConstants.userTransactions.contains(transaction.type)
+          && (wallet.balance < transaction.amount)) {
         AppUtilities.logger.e(MessageTranslationConstants.notEnoughFundsMsg.tr);
         return false;
       }
 
-      // await TransactionFirestore().updateStatus(transaction.id, transactiontStatus);
+      if(await WalletFirestore().addTransaction(transaction)) {
+        AppUtilities.logger.d('Transaction added successfully: ${transaction.id}');
+        transaction.status = TransactionStatus.completed;
+      } else {
+        AppUtilities.logger.d('Failed to add transaction: ${transaction.id}');
+        transaction.status = TransactionStatus.failed;
+      }
 
-      // if(transactiontStatus == TransactionStatus.completed) {
-      //   await handleProcessedPayment();
-      // } else {
-      //   Get.back();
-      //   AppUtilities.showSnackBar(
-      //     title: MessageTranslationConstants.errorProcessingPayment.tr,
-      //     message: errorMsg.tr,
-      //   );
-      //   return false;
-      // }
+      TransactionFirestore().updateStatus(transaction.id, transaction.status);
     } catch (e) {
       AppUtilities.logger.e(e.toString());
       return false;
     }
 
 
-    return true;
+    return transaction.status == TransactionStatus.completed;
   }
 
-  Future<bool> addCoinsToWallet(String walletId, {double amount = 0}) async {
-    AppUtilities.logger.t('Adding coins to wallet: $walletId');
-    int coinsQty = 0;
+  Future<bool> addCoinsToWallet(String walletId, double amount, {TransactionType transactionType = TransactionType.purchase}) async {
+    AppUtilities.logger.d('Adding $amount coins to wallet: $walletId');
 
     AppTransaction transaction = AppTransaction(
-      id: walletId,
       amount: amount,
       recipientId: walletId,
-      status: TransactionStatus.pending,
+      type: transactionType,
     );
 
     try {
-      try {
-        transaction.amount = Get.find<WalletController>().appCoinProduct.value.qty.toDouble();
-        AppUtilities.logger.d('$coinsQty from found WalletController');
-      } catch(e) {
-        transaction.amount = Get.put(WalletController()).appCoinProduct.value.qty.toDouble();
-        AppUtilities.logger.d('$coinsQty from initiated WalletController');
-      }
-
+      transaction.id = await TransactionFirestore().insert(transaction);
       if(transaction.amount > 0) {
-        await WalletFirestore().addTransaction(transaction);
+        if(await WalletFirestore().addTransaction(transaction)) {
+          AppUtilities.logger.d('Coins added to wallet: $walletId');
+          transaction.status = TransactionStatus.completed;
+        } else {
+          AppUtilities.logger.e('Failed to add coins to wallet: $walletId');
+          transaction.status = TransactionStatus.failed;
+        }
+        TransactionFirestore().updateStatus(transaction.id, transaction.status);
       } else {
         return false;
       }
-
-      await TransactionFirestore().insert(transaction);
-
     } catch (e) {
       AppUtilities.logger.e(e.toString());
       return false;
     }
 
-    return true;
+    return transaction.status == TransactionStatus.completed;
   }
 
 }

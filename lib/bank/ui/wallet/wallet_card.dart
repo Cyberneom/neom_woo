@@ -1,19 +1,11 @@
 import 'dart:math';
 
-import 'package:flutter/cupertino.dart'; // For CupertinoIcons if used, e.g. chip
 import 'package:flutter/material.dart';
+import 'package:get/get.dart'; // For GetBuilder
 import 'package:neom_commons/neom_commons.dart'; // Assuming this imports AppTheme, AppColor, AppAssets, AppTranslationConstants, etc.
-// If not, you might need individual imports:
-// import 'package:neom_commons/core/utils/app_theme.dart';
-// import 'package:neom_commons/core/utils/app_color.dart';
-// import 'package:neom_commons/core/utils/constants/app_assets.dart';
-// import 'package:neom_commons/core/utils/constants/app_translation_constants.dart';
-// import 'package:neom_commons/core/utils/constants/app_page_id_constants.dart';
-
 
 import '../widgets/bank_widgets.dart';
 import 'wallet_controller.dart'; // Your WalletController
-import 'package:get/get.dart'; // For GetBuilder
 
 class WalletCard extends StatelessWidget {
   const WalletCard({

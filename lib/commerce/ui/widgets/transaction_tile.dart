@@ -7,9 +7,12 @@ import '../../domain/models/app_transaction.dart';
 
 class TransactionTile extends StatelessWidget {
   final AppTransaction transaction;
+  final String walletId;
+
   const TransactionTile({
     super.key,
     required this.transaction,
+    required this.walletId,
   });
 
   @override
@@ -19,7 +22,7 @@ class TransactionTile extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       child: ListTile(
         leading: Image.asset(AppAssets.appCoin, height: 40),
-        title: Text(transaction.description,
+        title: Text(transaction.description.isNotEmpty ? transaction.description : transaction.type.name.tr.capitalize,
           style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18
@@ -30,12 +33,12 @@ class TransactionTile extends StatelessWidget {
         subtitle: Text(AppUtilities.dateFormat(transaction.createdTime),
           style: const TextStyle(fontSize: 15),
         ),
-        trailing: Text('${transaction.amount} ${transaction.currency.name.tr.toUpperCase()}',
+        trailing: Text('${transaction.recipientId == walletId ? '+' : '-'} ${transaction.amount} ${transaction.currency != AppCurrency.appCoin ?  transaction.currency.name.tr.toUpperCase() : ''}',
             style: const TextStyle(
                 color: AppColor.white,
                 fontSize: 18)
         ),
-        onTap: () => Get.toNamed(AppRouteConstants.transactionDetails, arguments: [transaction]),
+        // onTap: () => Get.toNamed(AppRouteConstants.transactionDetails, arguments: [transaction]),
       ),
     );
   }

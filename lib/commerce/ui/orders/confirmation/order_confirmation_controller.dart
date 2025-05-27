@@ -13,11 +13,10 @@ import 'package:neom_commons/neom_commons.dart';
 
 import '../../../data/firestore/order_firestore.dart';
 import '../../../data/firestore/sales_firestore.dart';
+import '../../../domain/models/app_order.dart';
 import '../../../domain/models/app_product.dart';
 import '../../../domain/models/app_sale.dart';
 import '../../../domain/models/app_transaction.dart';
-import '../../../domain/models/payment.dart';
-import '../../../domain/models/app_order.dart';
 import '../../../utils/constants/app_commerce_constants.dart';
 import '../../../utils/enums/payment_status.dart';
 import 'in_app_payment_queue_delegate.dart';

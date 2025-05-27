@@ -15,6 +15,7 @@ import '../../../commerce/domain/models/app_product.dart';
 import '../../../commerce/domain/models/app_transaction.dart';
 import '../../../commerce/domain/models/wallet.dart';
 import '../../../commerce/domain/use_cases/wallet_service.dart';
+import '../../data/transaction_firestore.dart';
 import '../../data/wallet_firestore.dart';
 
 class WalletController extends GetxController implements WalletService  {
@@ -24,10 +25,8 @@ class WalletController extends GetxController implements WalletService  {
   RxBool isLoading = true.obs;
 
   Wallet? wallet;
-  List<AppTransaction> transactions = [];
+  Map<String, AppTransaction> transactions = {};
   Map<String, AppOrder> orders = {};
-
-  /// late TabController tabController;
 
   Rx<AppProduct> appCoinProduct = AppProduct().obs;
   List<AppProduct> appCoinProducts = [];
@@ -48,11 +47,6 @@ class WalletController extends GetxController implements WalletService  {
     try {
       loadWalletInfo();
       // loadOrders();
-      /// tabController = TabController(
-      //   length: 3,
-      //   vsync: this,
-      // );
-      // tabController.addListener(_tabChanged);
       transaction?.senderId = userController.user.email;
     } catch (e) {
       AppUtilities.logger.e(e);
@@ -72,8 +66,9 @@ class WalletController extends GetxController implements WalletService  {
   Future<void> loadWalletInfo() async {
     try {
       await loadWallet();
+      await loadTransactions();
       await loadOrders();
-      // await loadCoinProducts();
+      //TODO await loadCoinProducts();
 
     } catch (e) {
       AppUtilities.logger.e(e.toString());
@@ -83,12 +78,25 @@ class WalletController extends GetxController implements WalletService  {
     update([AppPageIdConstants.walletHistory]);
   }
   Future<void> loadWallet() async {
-    //load WalletFirestore
+    AppUtilities.logger.t("Loading Wallet for ${userController.user.email}");
     wallet = await WalletFirestore().getOrCreate(userController.user.email);
-    //load TransactionsFirestore
+  }
+
+  Future<void> loadTransactions() async {
+    AppUtilities.logger.d("Loading Transactions for ${userController.user.email}");
+
+    transactions = await TransactionFirestore().retrieveByEmail(userController.user.email);
+    List<AppTransaction> transactionsToSort = transactions.values.toList();
+    transactionsToSort.sort((a, b) => a.createdTime.compareTo(b.createdTime));
+    transactions.clear();
+    for(AppTransaction transaction in transactionsToSort.reversed) {
+      transactions[transaction.id] = transaction;
+    }
   }
 
   Future<void> loadOrders() async {
+    AppUtilities.logger.d("Loading Orders for ${userController.user.email}");
+
     orders = await OrderFirestore().retrieveFromList(userController.user.orderIds);
     List<AppOrder> ordersToSort = orders.values.toList();
     ordersToSort.sort((a, b) => a.createdTime.compareTo(b.createdTime));
@@ -114,18 +122,6 @@ class WalletController extends GetxController implements WalletService  {
     }
   }
 
-  @override
-  void dispose() {
-    /// tabController.dispose();
-    super.dispose();
-  }
-
-
-  /// void _tabChanged() {
-  //   if (tabController.indexIsChanging) {
-  //     AppUtilities.logger.d('tabChanged: ${tabController.index}');
-  //   }
-  // }
 
   @override
   void changeAppCoinProduct(AppProduct selectedProduct) {

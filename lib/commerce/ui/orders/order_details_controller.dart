@@ -6,12 +6,12 @@ import 'package:neom_commons/core/utils/app_utilities.dart';
 import 'package:neom_commons/core/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/core/utils/enums/coupon_type.dart';
 
-import '../../data/firestore/invoice_firestore.dart';
 import '../../../bank/data/transaction_firestore.dart';
+import '../../data/firestore/invoice_firestore.dart';
+import '../../domain/models/app_order.dart';
 import '../../domain/models/app_product.dart';
 import '../../domain/models/app_transaction.dart';
 import '../../domain/models/invoice.dart';
-import '../../domain/models/app_order.dart';
 
 class OrderDetailsController extends GetxController with GetTickerProviderStateMixin {
 

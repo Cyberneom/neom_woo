@@ -7,7 +7,6 @@ class QuotationFirestore {
 
   final quotationReference = FirebaseFirestore.instance.collection(AppFirestoreCollectionConstants.quotations);
 
-  @override
   Future<AppQuotation> retrieve(String quotationId) async {
     AppUtilities.logger.d("Retrieving Quotation for id $quotationId");
     AppQuotation quotation = AppQuotation();  // Initialize with default values
@@ -32,7 +31,6 @@ class QuotationFirestore {
     return quotation;
   }
 
-  @override
   Future<String> insert(AppQuotation quotation) async {
     AppUtilities.logger.d("Inserting Quotation");
     String quotationId = quotation.id;
@@ -54,7 +52,6 @@ class QuotationFirestore {
     return quotationId;
   }
 
-  @override
   Future<bool> remove(AppQuotation quotation) async {
     AppUtilities.logger.d("Removing Quotation ${quotation.id}");
 
@@ -69,7 +66,6 @@ class QuotationFirestore {
     return false;
   }
 
-  @override
   Future<List<AppQuotation>> retrieveFromList(List<String> quotationIds) async {
     AppUtilities.logger.d("Getting quotations from list");
 

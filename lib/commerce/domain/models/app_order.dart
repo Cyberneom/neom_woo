@@ -7,7 +7,6 @@ import 'package:in_app_purchase_android/src/types/google_play_purchase_details.d
 import 'package:in_app_purchase_storekit/src/types/app_store_purchase_details.dart';
 import 'package:neom_commons/core/domain/model/subscription_plan.dart';
 import 'package:neom_commons/core/utils/enums/profile_type.dart';
-import '../../utils/enums/transaction_type.dart';
 import 'app_product.dart';
 
 class AppOrder {

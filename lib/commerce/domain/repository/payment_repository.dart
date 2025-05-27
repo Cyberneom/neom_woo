@@ -1,6 +1,5 @@
 import '../../utils/enums/payment_status.dart';
 import '../models/app_transaction.dart';
-import '../models/payment.dart';
 
 abstract class TransactionRepository {
 

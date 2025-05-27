@@ -1,5 +1,4 @@
 
-import 'package:flutter_stripe/flutter_stripe.dart';
 
 abstract class PaymentGatewayService {
 

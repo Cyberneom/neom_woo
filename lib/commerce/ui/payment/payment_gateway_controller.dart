@@ -22,13 +22,13 @@ import 'package:neom_commons/core/utils/validator.dart';
 
 import '../../../bank/data/implementations/app_bank_controller.dart';
 import '../../../bank/data/implementations/app_stripe_controller.dart';
-import '../../data/firestore/invoice_firestore.dart';
-import '../../data/firestore/order_firestore.dart';
 import '../../../bank/data/transaction_firestore.dart';
 import '../../../bank/data/wallet_firestore.dart';
+import '../../data/firestore/invoice_firestore.dart';
+import '../../data/firestore/order_firestore.dart';
+import '../../domain/models/app_order.dart';
 import '../../domain/models/app_transaction.dart';
 import '../../domain/models/invoice.dart';
-import '../../domain/models/app_order.dart';
 import '../../domain/models/wallet.dart';
 import '../../domain/use_cases/payment_gateway_service.dart';
 import '../../utils/enums/payment_status.dart';
@@ -126,17 +126,16 @@ class PaymentGatewayController extends GetxController with GetTickerProviderStat
 
   Future<void> processPayment() async {
 
-    String transactionId = await TransactionFirestore().insert(transaction);
-    transaction.id = transactionId;
 
-    if(transaction?.currency == AppCurrency.appCoin) {
+
+    if(transaction.currency == AppCurrency.appCoin) {
       AppUtilities.logger.d('Paying with AppCoins');
+      transaction.id = await TransactionFirestore().insert(transaction);
+
       bool completed = await appBankController.processTransaction(transaction);
 
-      transactiontStatus.value = completed ?
-        TransactionStatus.completed : TransactionStatus.failed;
-
-      TransactionFirestore().updateStatus(transaction.id, transactiontStatus.value);
+      transactiontStatus.value = completed ? TransactionStatus.completed : TransactionStatus.failed;
+      transaction.status = transactiontStatus.value;
 
       if(completed) {
         await handleProcessedTransaction();
@@ -309,7 +308,7 @@ class PaymentGatewayController extends GetxController with GetTickerProviderStat
                 arguments: [AppRouteConstants.paymentGateway, AppRouteConstants.home]);
             break;
           case ProductType.appCoin:
-            appBankController.addCoinsToWallet(user.id);
+            appBankController.addCoinsToWallet(user.id, transaction.amount);
             Get.toNamed(AppRouteConstants.splashScreen,
                 arguments: [AppRouteConstants.paymentGateway, AppRouteConstants.wallet]);
             break;

@@ -12,7 +12,6 @@ import 'package:neom_commons/core/utils/constants/app_assets.dart';
 import 'package:neom_commons/core/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/core/utils/constants/app_translation_constants.dart';
 import 'package:neom_commons/core/utils/core_utilities.dart';
-import 'package:neom_commons/core/utils/enums/app_currency.dart';
 import 'package:neom_commons/core/utils/enums/product_type.dart';
 import '../../utils/commerce_utilities.dart';
 import 'order_details_controller.dart';
@@ -218,7 +217,7 @@ class OrderDetailsPage extends StatelessWidget {
                             fontSize: 16
                         )
                     ),
-                    Text("${((_.product?.regularPrice?.amount ?? 0) - (_.appTransaction.amount ?? 0))} ${_.appTransaction.currency.name.tr.toUpperCase() ?? AppCurrency.mxn.name.toUpperCase()}",
+                    Text("${((_.product?.regularPrice?.amount ?? 0) - (_.appTransaction.amount))} ${_.appTransaction.currency.name.tr.toUpperCase()}",
                         style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 16)
@@ -235,7 +234,7 @@ class OrderDetailsPage extends StatelessWidget {
                             color: AppColor.white80,
                             fontSize: 16, fontWeight: FontWeight.w600)
                     ),
-                    Text("${_.appTransaction.amount ?? 0} ${_.appTransaction.currency.name.tr.toUpperCase() ??  AppCurrency.mxn.name.toUpperCase()}",
+                    Text("${_.appTransaction.amount} ${_.appTransaction.currency.name.tr.toUpperCase()}",
                         style: TextStyle(
                             color: AppColor.white80,
                             fontSize: 16)

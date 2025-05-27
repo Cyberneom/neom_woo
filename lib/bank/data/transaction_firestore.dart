@@ -40,26 +40,31 @@ class TransactionFirestore implements TransactionRepository {
   @override
   Future<String> insert(AppTransaction transaction) async {
     AppUtilities.logger.d("Inserting transaction ${transaction.id}");
-    String transactionId = "";
 
     try {
 
+      transaction.createdTime = DateTime.now().millisecondsSinceEpoch;
+
+      if(transaction.id.isEmpty) {
+        if(transaction.recipientId?.isNotEmpty ?? false) {
+          transaction.id = "${transaction.recipientId}_${transaction.createdTime}";
+        } else {
+          transaction.id = "${transaction.senderId}_${transaction.createdTime}";
+        }
+      }
+
       if(transaction.id.isNotEmpty) {
         await transactionReference.doc(transaction.id).set(transaction.toJSON());
-        transactionId = transaction.id;
       } else {
-        DocumentReference documentReference = await transactionReference
-            .add(transaction.toJSON());
-        transactionId = documentReference.id;
-        transaction.id = transactionId;
-        
+        DocumentReference documentReference = await transactionReference.add(transaction.toJSON());
+        transaction.id = documentReference.id;
       }
       AppUtilities.logger.i("AppTransaction for Order ${transaction.orderId} was added with id ${transaction.id}");
     } catch (e) {
       AppUtilities.logger.e(e.toString());
     }
 
-    return transactionId;
+    return transaction.id;
 
   }
 
@@ -148,6 +153,29 @@ class TransactionFirestore implements TransactionRepository {
           transactions.add(transaction);
         }
       }
+    } catch (e) {
+      AppUtilities.logger.e(e.toString());
+    }
+
+    return transactions;
+  }
+
+  Future<Map<String, AppTransaction>> retrieveByEmail(String email) async {
+    AppUtilities.logger.d("retrieveByEmail for $email");
+
+    Map<String, AppTransaction> transactions = {};
+
+    try {
+      QuerySnapshot snapshot = await transactionReference.get();
+
+      for(var document in snapshot.docs) {
+        AppTransaction transaction = AppTransaction.fromJSON(document.data());
+        if(transaction.senderId == email || transaction.recipientId == email) {
+          transaction.id = document.id;
+          transactions[transaction.id] = transaction;
+        }
+      }
+      AppUtilities.logger.d("${transactions.length} Transactions were retrieved");
     } catch (e) {
       AppUtilities.logger.e(e.toString());
     }

@@ -2,16 +2,14 @@ import 'dart:core';
 
 import 'package:get/get.dart';
 import 'package:neom_commons/core/domain/model/app_release_item.dart';
-
 import 'package:neom_commons/neom_commons.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../commerce/data/firestore/order_firestore.dart';
 import '../../bank/data/transaction_firestore.dart';
+import '../../commerce/data/firestore/order_firestore.dart';
+import '../../commerce/domain/models/app_order.dart';
 import '../../commerce/domain/models/app_product.dart';
 import '../../commerce/domain/models/app_transaction.dart';
-import '../../commerce/domain/models/payment.dart';
-import '../../commerce/domain/models/app_order.dart';
 import '../../commerce/utils/enums/payment_status.dart';
 import '../../commerce/utils/enums/transaction_type.dart';
 import '../domain/use_cases/woo_webview_service.dart';

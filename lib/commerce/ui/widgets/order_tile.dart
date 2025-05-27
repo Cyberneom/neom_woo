@@ -21,7 +21,7 @@ class OrderTile extends StatelessWidget {
     if(order.product?.type == ProductType.appCoin) {
       leadingImg = Image.asset(AppAssets.appCoin, height: 40);
     } else {
-      leadingImg  = Image.network(order.product?.imgUrl.isNotEmpty ?? false ?  order.product!.imgUrl : AppFlavour.getNoImageUrl());
+      leadingImg  = Image.network(order.product?.imgUrl.isNotEmpty ?? false ?  order.product!.imgUrl : AppFlavour.getAppLogoUrl());
     }
 
     return Padding(
