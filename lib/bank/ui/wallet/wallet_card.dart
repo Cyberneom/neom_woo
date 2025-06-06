@@ -16,9 +16,7 @@ class WalletCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetBuilder<WalletController>(
       id: AppPageIdConstants.walletHistory, // Ensure this ID matches if you update from controller
-      // init: WalletController(), // init is usually not needed here if controller is already initialized by the page
       builder: (_) => Container(
-        width: double.infinity,
         height: MediaQuery.of(context).size.width / 2, // Slightly taller for more content space
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.all(Radius.circular(20.0)), // Slightly less rounded
@@ -54,7 +52,6 @@ class WalletCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute space
             children: [
-              // Top Row: Coin Name and Chip Icon
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,14 +87,13 @@ class WalletCard extends StatelessWidget {
                   ),
                 ],
               ),
-              AppTheme.heightSpace10,
               Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     SizedBox(
-                      width: AppTheme.fullWidth(context) / 7, // Adjusted icon size
-                      height: AppTheme.fullWidth(context) / 7,
+                      width: AppTheme.fullWidth(context) / 7.5, // Adjusted icon size
+                      height: AppTheme.fullWidth(context) / 7.5,
                       child: ClipRRect(
                         borderRadius: const BorderRadius.all(Radius.circular(12.0)),
                         child: Image.asset(AppAssets.appCoin, fit: BoxFit.contain),
@@ -119,7 +115,7 @@ class WalletCard extends StatelessWidget {
                 ),
               ),
 
-              // Bottom Row: Dummy Card Number
+              /// Bottom Row: Dummy Card Number
               // Text(
               //   "**** **** **** ${_.wallet.id.isNotEmpty ? _.wallet.id.substring(_.wallet.id.length - min(4,_.wallet.id.length)) : '****'}", // Display last 4 digits of wallet ID or a placeholder
               //   style: TextStyle(

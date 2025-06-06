@@ -40,7 +40,7 @@ class OrderConfirmationController extends GetxController with GetTickerProviderS
   // AppReleaseItem releaseItem = AppReleaseItem();
 
   AppCoupon? coupon;
-  AppTransaction? transaction;
+  AppTransaction transaction = AppTransaction();
 
   double discountAmount = 0.0;
   double discountPercentage = 0.0;
@@ -71,7 +71,7 @@ class OrderConfirmationController extends GetxController with GetTickerProviderS
     try {
 
       profile = userController.user.profiles.first;
-      transaction?.senderId = userController.user.email;
+      transaction.senderId = userController.user.email;
 
       if(Get.arguments != null && Get.arguments.isNotEmpty) {
         if(Get.arguments[0] is AppProduct) {
@@ -79,7 +79,6 @@ class OrderConfirmationController extends GetxController with GetTickerProviderS
           order.customerEmail = userController.user.email;
           order.description = product.name;
           order.product = product;
-          transaction?.recipientId = product.ownerEmail ?? '';
 
           switch(product.type) {
             case ProductType.event:
@@ -106,9 +105,12 @@ class OrderConfirmationController extends GetxController with GetTickerProviderS
           order.description = subscriptionPlan.name.tr;
           order.product = product;
           order.subscriptionPlan = subscriptionPlan;
-
           inAppProductId = subscriptionPlan.id;
         }
+
+        transaction.amount = product.salePrice?.amount ?? 0;
+        transaction.currency = product.salePrice?.currency ?? AppCurrency.appCoin;
+        transaction.recipientId = product.ownerEmail ?? '';
 
         if(Get.arguments.length > 1 && Get.arguments[1] is String) {
           fromRoute = Get.arguments[1];
@@ -135,8 +137,8 @@ class OrderConfirmationController extends GetxController with GetTickerProviderS
       order.createdTime = now.millisecondsSinceEpoch;
 
       if(product.id.isNotEmpty) {
-        transaction?.amount = product.salePrice?.amount ?? 0;
-        transaction?.currency = product.salePrice?.currency ?? AppCurrency.appCoin;
+        transaction.amount = product.salePrice?.amount ?? 0;
+        transaction.currency = product.salePrice?.currency ?? AppCurrency.appCoin;
 
         sales = await SalesFirestore().retrieveSales(product.type);
         sales.orderNumber = sales.orderNumber + 1;
@@ -179,7 +181,7 @@ class OrderConfirmationController extends GetxController with GetTickerProviderS
         if(order.product?.type == ProductType.subscription) {
           Get.toNamed(AppRouteConstants.stripeWebView, arguments: [order, fromRoute, context]);
         } else {
-          transaction?.orderId = order.id;
+          transaction.orderId = order.id;
           Get.toNamed(AppRouteConstants.paymentGateway, arguments: [transaction, order]);
         }
         SalesFirestore().updateOrderNumber(sales.orderNumber, order.product!.type);
@@ -264,7 +266,7 @@ class OrderConfirmationController extends GetxController with GetTickerProviderS
             order.appStorePurchaseDetails = purchaseDetails;
           }
 
-          transaction?.status = TransactionStatus.completed;
+          transaction.status = TransactionStatus.completed;
           await confirmOrder();
         } else if (purchaseDetails.pendingCompletePurchase) {
           await InAppPurchase.instance.completePurchase(purchaseDetails);

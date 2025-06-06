@@ -64,6 +64,8 @@ class WalletController extends GetxController implements WalletService  {
   }
 
   Future<void> loadWalletInfo() async {
+    AppUtilities.logger.d("Loading Wallet Info for ${userController.user.email}");
+
     try {
       await loadWallet();
       await loadTransactions();

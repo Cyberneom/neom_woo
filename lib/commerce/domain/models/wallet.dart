@@ -39,7 +39,7 @@ class Wallet {
       : id = data["id"] ?? "",
         balance = data["balance"]?.toDouble() ?? 0.0,
         currency = EnumToString.fromString(AppCurrency.values, data["currency"]) ?? AppCurrency.appCoin,
-        status = EnumToString.fromString(WalletStatus.values, data["status"]) ?? WalletStatus.active,
+        status = EnumToString.fromString(WalletStatus.values, data["status"]) ?? WalletStatus.suspended,
         createdTime = data["createdTime"]?.toInt() ?? 0,
         lastUpdated = data["lastUpdated"]?.toInt() ?? 0,
         lastTransactionId = data["lastTransactionId"];
