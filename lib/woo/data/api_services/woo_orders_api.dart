@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:neom_commons/core/app_flavour.dart';
-import 'package:neom_commons/core/domain/model/app_user.dart';
-import 'package:neom_commons/core/utils/app_utilities.dart';
+import 'package:neom_core/core/app_config.dart';
+import 'package:neom_core/core/app_properties.dart';
+import 'package:neom_core/core/domain/model/app_user.dart';
 
 import '../../domain/model/order/woo_billing.dart';
 import '../../domain/model/order/woo_order.dart';
@@ -20,8 +20,8 @@ class WooOrdersApi {
   static Future<String> createOrder(String email, List<WooOrderLineItem> orderLineItems, {
     String? customerId, WooBilling? billingAddress, WooShipping? shippingAddress, WooOrderStatus orderStatus = WooOrderStatus.processing}) async {
 
-    String url = '${AppFlavour.getWooUrl()}/orders';
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String url = '${AppProperties.getWooUrl()}/orders';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
 
 
     WooOrder newOrder = WooOrder(
@@ -45,25 +45,25 @@ class WooOrdersApi {
     String orderId = '';
 
     if (response.statusCode == 201) {
-      AppUtilities.logger.i('Order created successfully!');
+      AppConfig.logger.i('Order created successfully!');
       // Decodifica la respuesta JSON
       final responseData = jsonDecode(response.body);
       // Obtén el orderId de la respuesta
       orderId = responseData['id'].toString();
     } else {
-      AppUtilities.logger.e('Failed to create order: ${response.statusCode}');
-      AppUtilities.logger.e('Response: ${response.body}');
+      AppConfig.logger.e('Failed to create order: ${response.statusCode}');
+      AppConfig.logger.e('Response: ${response.body}');
     }
 
     return orderId;
   }
 
   static Future<List<WooOrder>> getOrders({perPage = 25, page = 1, WooOrderStatus? status}) async {
-    AppUtilities.logger.i('getOrders');
+    AppConfig.logger.i('getOrders');
 
-    String url = '${AppFlavour.getWooUrl()}/orders?page=$page&per_page=$perPage';
+    String url = '${AppProperties.getWooUrl()}/orders?page=$page&per_page=$perPage';
     if(status != null) url = '$url&status=${status.name}';
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
 
     List<WooOrder> wooOrders = [];
 
@@ -77,26 +77,26 @@ class WooOrdersApi {
 
     if (response.statusCode == 200) {
       List<dynamic> ordersJson = jsonDecode(response.body);
-      AppUtilities.logger.i(ordersJson.toString());
+      AppConfig.logger.i(ordersJson.toString());
       for (var json in ordersJson) {
         WooOrder wooOrder = WooOrder.fromJson(json);
         if(json['id'].toString() == '6364') {
-          AppUtilities.logger.i("");
+          AppConfig.logger.i("");
         }
-        AppUtilities.logger.i(json.toString());
+        AppConfig.logger.i(json.toString());
         wooOrders.add(wooOrder);
       }
       // return ordersJson.map((orderJson) => WooOrder.fromJSON(orderJson)).toList();
     } else {
-      AppUtilities.logger.e('Failed to fetch orders: ${response.statusCode}');
-      AppUtilities.logger.e('Response: ${response.body}');
+      AppConfig.logger.e('Failed to fetch orders: ${response.statusCode}');
+      AppConfig.logger.e('Response: ${response.body}');
     }
 
     return wooOrders;
   }
 
   static Future<String> createSessionOrder(AppUser user, String itemName, int quantity,{bool isNupale = false}) async {
-    AppUtilities.logger.d('Processing Nupale Session Order of $quantity for $itemName');
+    AppConfig.logger.d('Processing Nupale Session Order of $quantity for $itemName');
 
     String orderId = '';
     String variationId = isNupale ? await WooProductsApi.getNupaleVariationId(itemName) :  await WooProductsApi.getCaseteVariationId(itemName);

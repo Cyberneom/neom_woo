@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:neom_core/core/app_config.dart';
+import 'package:neom_core/core/domain/model/app_user.dart';
 
-import 'package:neom_commons/core/domain/model/app_user.dart';
-import 'package:neom_commons/core/utils/app_utilities.dart';
 
 class WooUsersApi {
   Future<void> createWooCommerceUser(AppUser user) async {
@@ -21,9 +21,9 @@ class WooUsersApi {
 
     final response = await http.post(url, headers: headers, body: body);
     if (response.statusCode == 201) {
-      AppUtilities.logger.i('Usuario creado exitosamente en WooCommerce');
+      AppConfig.logger.i('Usuario creado exitosamente en WooCommerce');
     } else {
-      AppUtilities.logger.e('Error al crear usuario: ${response.body}');
+      AppConfig.logger.e('Error al crear usuario: ${response.body}');
     }
   }
 

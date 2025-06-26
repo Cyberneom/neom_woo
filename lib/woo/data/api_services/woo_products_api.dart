@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:neom_core/core/app_config.dart';
+import 'package:neom_core/core/app_properties.dart';
+import 'package:neom_core/core/domain/model/woo/woo_product.dart';
+import 'package:neom_core/core/domain/model/woo/woo_product_attribute.dart';
+import 'package:neom_core/core/utils/enums/woo/woo_product_status.dart';
 
-import 'package:neom_commons/core/app_flavour.dart';
-import 'package:neom_commons/core/domain/model/woo/woo_product.dart';
-import 'package:neom_commons/core/domain/model/woo/woo_product_attribute.dart';
-import 'package:neom_commons/core/utils/app_utilities.dart';
-import 'package:neom_commons/core/utils/enums/woo/woo_product_status.dart';
 import '../../utils/constants/woo_attribute_constants.dart';
 import '../../utils/constants/woo_constants.dart';
 
@@ -16,12 +16,12 @@ class WooProductsApi {
   static Future<List<WooProduct>> getProducts({int perPage = 25, int page = 1,
     WooProductStatus status = WooProductStatus.publish, List<String> categoryIds = const []}) async {
     
-    String url = '${AppFlavour.getWooUrl()}/products?page=$page&per_page=$perPage&status=${status.name}';
+    String url = '${AppProperties.getWooUrl()}/products?page=$page&per_page=$perPage&status=${status.name}';
     if (categoryIds.isNotEmpty) {
       String categoryParam = categoryIds.join(','); // Une los IDs con comas
       url = '$url&category=$categoryParam';
     }
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
     List<WooProduct> products = [];
 
     try {
@@ -36,26 +36,26 @@ class WooProductsApi {
         List<dynamic> data = jsonDecode(response.body);
         for(var item in data.asMap().values) {
           WooProduct product = WooProduct.fromJSON(item);
-          AppUtilities.logger.t('Product ${product.id} with name ${product.name}');
+          AppConfig.logger.t('Product ${product.id} with name ${product.name}');
           products.add(product);
         }
         
-        AppUtilities.logger.d('${products.length} Products retrieved');
+        AppConfig.logger.d('${products.length} Products retrieved');
       } else {
-        AppUtilities.logger.w(response.body.toString());
+        AppConfig.logger.w(response.body.toString());
         jsonDecode(response.body);
         throw Exception('Error al cargar productos');
       }
     } catch (e) {
-      AppUtilities.logger.e(e.toString());
+      AppConfig.logger.e(e.toString());
     }
     return products;
   }
 
   static Future<void> createProduct(WooProduct product) async {
 
-    String url = '${AppFlavour.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String url = '${AppProperties.getWooUrl()}/products';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
 
     final response = await http.post(
       Uri.parse(url),
@@ -67,16 +67,16 @@ class WooProductsApi {
     );
 
     if (response.statusCode == 201) {
-      AppUtilities.logger.i('Producto creado correctamente');
+      AppConfig.logger.i('Producto creado correctamente');
     } else {
-      AppUtilities.logger.i('Error al crear el producto: ${response.body}');
+      AppConfig.logger.i('Error al crear el producto: ${response.body}');
     }
   }
 
   static Future<void> addAttributesToProduct(String productId, List<WooProductAttribute> attributes, {bool isNew = false}) async {
 
-    String url = '${AppFlavour.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String url = '${AppProperties.getWooUrl()}/products';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
     int position = 0;
     try {
       List<WooProductAttribute> totalAttributes = [];
@@ -118,19 +118,19 @@ class WooProductsApi {
       );
 
       if (response.statusCode == 200) {
-        AppUtilities.logger.i('Atributos agregados exitosamente');
+        AppConfig.logger.i('Atributos agregados exitosamente');
       } else {
-        AppUtilities.logger.i('Error al agregar atributos: ${response.statusCode}');
+        AppConfig.logger.i('Error al agregar atributos: ${response.statusCode}');
       }
     } catch (e) {
-      AppUtilities.logger.e(e.toString());
+      AppConfig.logger.e(e.toString());
     }
   }
 
   static Future<WooProduct?> getProduct(String productId) async {
 
-    String url = '${AppFlavour.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String url = '${AppProperties.getWooUrl()}/products';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
 
     WooProduct? product;
     try {
@@ -144,10 +144,10 @@ class WooProductsApi {
       if (response.statusCode == 200) {
         product = WooProduct.fromJSON(jsonDecode(response.body));
       } else {
-        AppUtilities.logger.i('Error al obtener atributos: ${response.statusCode}');
+        AppConfig.logger.i('Error al obtener atributos: ${response.statusCode}');
       }
     } catch (e) {
-      AppUtilities.logger.e(e.toString());
+      AppConfig.logger.e(e.toString());
     }
 
     return product;
@@ -155,8 +155,8 @@ class WooProductsApi {
 
   static Future<List<WooProduct>> getVariations(int productId, {int perPage = 100, int page = 1, String searchParam = ''}) async {
 
-    String url = '${AppFlavour.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String url = '${AppProperties.getWooUrl()}/products';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
     List<WooProduct> productVariations = [];
 
     final response = await http.get(
@@ -177,8 +177,8 @@ class WooProductsApi {
   // Crear una nueva variación si no existe
   static Future<String> createVariation(String productId, String attributeName, String optionValue, {String sku = ''}) async {
 
-    String url = '${AppFlavour.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppFlavour.getWooClientKey()}:${AppFlavour.getWooClientSecret()}'));
+    String url = '${AppProperties.getWooUrl()}/products';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
 
     final response = await http.post(
       Uri.parse('$url/$productId/variations'),
@@ -200,11 +200,11 @@ class WooProductsApi {
     );
 
     if (response.statusCode == 201) {
-      AppUtilities.logger.i('Variation was created');
+      AppConfig.logger.i('Variation was created');
       final variation = json.decode(response.body);
       return variation['id'].toString();
     } else {
-      AppUtilities.logger.e('Error creating variation: ${response.statusCode}');
+      AppConfig.logger.e('Error creating variation: ${response.statusCode}');
     }
     return '';
   }
@@ -217,17 +217,17 @@ class WooProductsApi {
 
     if(variations.isNotEmpty) {
       if(variations.length == 1) {
-        AppUtilities.logger.d('A Single Product Variation was retrieved.');
+        AppConfig.logger.d('A Single Product Variation was retrieved.');
       } else {
-        AppUtilities.logger.d('${variations.length} Product Variations were retrieved.');
+        AppConfig.logger.d('${variations.length} Product Variations were retrieved.');
       }
       variationId = variations.first.id.toString();
     } else {
-      AppUtilities.logger.d('Product Variations are empty');
+      AppConfig.logger.d('Product Variations are empty');
     }
 
     if (variationId.isEmpty) {
-      AppUtilities.logger.d('VariationId is empty');
+      AppConfig.logger.d('VariationId is empty');
       variationId = await createNupaleVariation(nupaleProduct, itemName);
     }
 
@@ -262,17 +262,17 @@ class WooProductsApi {
 
     if(variations.isNotEmpty) {
       if(variations.length == 1) {
-        AppUtilities.logger.d('A Single Product Variation was retrieved.');
+        AppConfig.logger.d('A Single Product Variation was retrieved.');
       } else {
-        AppUtilities.logger.d('${variations.length} Product Variations were retrieved.');
+        AppConfig.logger.d('${variations.length} Product Variations were retrieved.');
       }
       variationId = variations.first.id.toString();
     } else {
-      AppUtilities.logger.d('Product Variations are empty');
+      AppConfig.logger.d('Product Variations are empty');
     }
 
     if (variationId.isEmpty) {
-      AppUtilities.logger.d('VariationId is empty');
+      AppConfig.logger.d('VariationId is empty');
       variationId = await createCaseteVariation(caseteProduct, itemName);
     }
 

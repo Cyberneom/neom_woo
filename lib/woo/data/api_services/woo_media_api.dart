@@ -3,17 +3,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:neom_commons/core/app_flavour.dart';
-import 'package:neom_commons/core/utils/app_utilities.dart';
-
+import 'package:neom_core/core/app_config.dart';
+import 'package:neom_core/core/app_properties.dart';
 
 class WooMediaApi {
 
 
   static Future<String> uploadMediaToWordPress(File file, {String fileName = ''}) async {
-    AppUtilities.logger.i("Uploading media file to WordPress");
+    AppConfig.logger.i("Uploading media file to WordPress");
 
-    String url = '${AppFlavour.getSiteUrl()}/wp-json/wp/v2/media';
+    String url = '${AppProperties.getSiteUrl()}/wp-json/wp/v2/media';
     String mediaUrl = '';
 
     try {
@@ -41,20 +40,20 @@ class WooMediaApi {
         var responseData = await response.stream.bytesToString();
         var jsonData = jsonDecode(responseData);
         mediaUrl = jsonData['source_url'];
-        AppUtilities.logger.i('Media uploaded successfully: $mediaUrl');
+        AppConfig.logger.i('Media uploaded successfully: $mediaUrl');
       } else {
-        AppUtilities.logger.e('Failed to upload media: ${response.statusCode}');
-        AppUtilities.logger.e('Response: ${await response.stream.bytesToString()}');
+        AppConfig.logger.e('Failed to upload media: ${response.statusCode}');
+        AppConfig.logger.e('Response: ${await response.stream.bytesToString()}');
       }
     } catch (e) {
-      AppUtilities.logger.e('Error uploading media: $e');
+      AppConfig.logger.e('Error uploading media: $e');
     }
 
     return mediaUrl;
   }
 
   static Future<String> getJwtToken() async {
-    String url = '${AppFlavour.getSiteUrl()}/wp-json/jwt-auth/v1/token';
+    String url = '${AppProperties.getSiteUrl()}/wp-json/jwt-auth/v1/token';
 
     final response = await http.post(
       Uri.parse(url),
