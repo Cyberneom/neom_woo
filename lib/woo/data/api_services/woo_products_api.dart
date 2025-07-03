@@ -4,14 +4,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:neom_core/core/app_config.dart';
 import 'package:neom_core/core/app_properties.dart';
-import 'package:neom_core/core/domain/model/woo/woo_product.dart';
-import 'package:neom_core/core/domain/model/woo/woo_product_attribute.dart';
-import 'package:neom_core/core/utils/enums/woo/woo_product_status.dart';
 
+import '../../domain/model/woo_product.dart';
+import '../../domain/model/woo_product_attribute.dart';
 import '../../utils/constants/woo_attribute_constants.dart';
 import '../../utils/constants/woo_constants.dart';
+import '../../utils/enums/woo_product_status.dart';
 
-class WooProductsApi {
+class WooProductsAPI {
 
   static Future<List<WooProduct>> getProducts({int perPage = 25, int page = 1,
     WooProductStatus status = WooProductStatus.publish, List<String> categoryIds = const []}) async {
@@ -247,9 +247,9 @@ class WooProductsApi {
         variation: true,
       );
     }
-    await WooProductsApi.addAttributesToProduct(nupaleProduct.id.toString(), [currentAttribute]);
+    await WooProductsAPI.addAttributesToProduct(nupaleProduct.id.toString(), [currentAttribute]);
     String variationId = '';
-    variationId = await WooProductsApi.createVariation(nupaleProduct.id.toString(), WooAttributeConstants.itemName, itemName);
+    variationId = await WooProductsAPI.createVariation(nupaleProduct.id.toString(), WooAttributeConstants.itemName, itemName);
 
     return variationId;
   }
@@ -292,9 +292,9 @@ class WooProductsApi {
         variation: true,
       );
     }
-    await WooProductsApi.addAttributesToProduct(caseteProduct.id.toString(), [currentAttribute]);
+    await WooProductsAPI.addAttributesToProduct(caseteProduct.id.toString(), [currentAttribute]);
     String variationId = '';
-    variationId = await WooProductsApi.createVariation(caseteProduct.id.toString(), WooAttributeConstants.itemName, itemName);
+    variationId = await WooProductsAPI.createVariation(caseteProduct.id.toString(), WooAttributeConstants.itemName, itemName);
 
     return variationId;
   }

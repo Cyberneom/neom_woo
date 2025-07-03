@@ -4,8 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:neom_core/core/app_config.dart';
 import 'package:neom_core/core/domain/model/app_user.dart';
 
+//TODO Working on it
+class WooUsersAPI {
 
-class WooUsersApi {
   Future<void> createWooCommerceUser(AppUser user) async {
     final url = Uri.parse('https://tudominio.com/wp-json/wc/v3/customers');
     final headers = {

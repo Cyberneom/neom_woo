@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:neom_core/core/app_config.dart';
 import 'package:neom_core/core/app_properties.dart';
 
-class WooMediaApi {
+class WooMediaAPI {
 
 
   static Future<String> uploadMediaToWordPress(File file, {String fileName = ''}) async {

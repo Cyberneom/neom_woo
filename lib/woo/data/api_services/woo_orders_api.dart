@@ -15,7 +15,7 @@ import '../../utils/enums/woo_order_status.dart';
 import '../../utils/enums/woo_payment_method.dart';
 import 'woo_products_api.dart';
 
-class WooOrdersApi {
+class WooOrdersAPI {
 
   static Future<String> createOrder(String email, List<WooOrderLineItem> orderLineItems, {
     String? customerId, WooBilling? billingAddress, WooShipping? shippingAddress, WooOrderStatus orderStatus = WooOrderStatus.processing}) async {
@@ -99,7 +99,7 @@ class WooOrdersApi {
     AppConfig.logger.d('Processing Nupale Session Order of $quantity for $itemName');
 
     String orderId = '';
-    String variationId = isNupale ? await WooProductsApi.getNupaleVariationId(itemName) :  await WooProductsApi.getCaseteVariationId(itemName);
+    String variationId = isNupale ? await WooProductsAPI.getNupaleVariationId(itemName) :  await WooProductsAPI.getCaseteVariationId(itemName);
 
     if(variationId.isNotEmpty) {
       List<WooOrderLineItem> lineItems = [

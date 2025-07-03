@@ -1,2 +1,2 @@
-# neom_commerce
-Commerce for Cyberneom
+# neom_woo
+Woo Commerce for Open Neom

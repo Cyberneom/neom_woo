@@ -19,10 +19,7 @@ dependencies:
     git:
       url: git@github.com:Cyberneom/neom_commons.git
 
-  freezed_annotation: ^3.0.0
-
-#  flutter_stripe: ^11.5.0
-#  in_app_purchase: ^3.2.3
+  freezed_annotation: ^2.4.1
 
 dev_dependencies:
   flutter_test:
