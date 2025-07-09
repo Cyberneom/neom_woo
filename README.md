@@ -1,2 +1,2 @@
 # neom_woo
-Woo Commerce for Open Neom
+Woo Woo for Open Neom
