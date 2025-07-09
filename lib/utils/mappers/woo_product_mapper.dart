@@ -1,15 +1,15 @@
 import 'package:enum_to_string/enum_to_string.dart';
 import 'package:get/get.dart';
-import 'package:neom_commons/commons/utils/app_utilities.dart';
-import 'package:neom_core/core/domain/model/app_release_item.dart';
-import 'package:neom_core/core/domain/model/item_list.dart';
-import 'package:neom_core/core/domain/model/price.dart';
-import 'package:neom_core/core/utils/enums/app_currency.dart';
-import 'package:neom_core/core/utils/enums/itemlist_type.dart';
-import 'package:neom_core/core/utils/enums/media_item_type.dart';
-import 'package:neom_core/core/utils/enums/owner_type.dart';
-import 'package:neom_core/core/utils/enums/release_status.dart';
-import 'package:neom_core/core/utils/enums/release_type.dart';
+import 'package:neom_commons/utils/text_utilities.dart';
+import 'package:neom_core/domain/model/app_release_item.dart';
+import 'package:neom_core/domain/model/item_list.dart';
+import 'package:neom_core/domain/model/price.dart';
+import 'package:neom_core/utils/enums/app_currency.dart';
+import 'package:neom_core/utils/enums/itemlist_type.dart';
+import 'package:neom_core/utils/enums/media_item_type.dart';
+import 'package:neom_core/utils/enums/owner_type.dart';
+import 'package:neom_core/utils/enums/release_status.dart';
+import 'package:neom_core/utils/enums/release_type.dart';
 
 import '../../domain/model/woo_product.dart';
 import '../../domain/model/woo_product_downloads.dart';
@@ -28,7 +28,7 @@ class WooProductMapper {
         type: (product.attributes?.containsKey('type') ?? false) ? EnumToString.fromString(ReleaseType.values, product.attributes!['type']!.options.first) ?? ReleaseType.single : ReleaseType.single,
         status: EnumToString.fromString(ReleaseStatus.values, product.status.name) ?? ReleaseStatus.draft,
         ownerEmail: (product.attributes?.containsKey('ownerEmail') ?? false) ? product.attributes!['ownerEmail']!.options.first : '',
-        ownerName: (product.attributes?.containsKey('ownerName') ?? false) ? product.attributes!['ownerName']!.options.first : AppUtilities.getArtistName(product.name),
+        ownerName: (product.attributes?.containsKey('ownerName') ?? false) ? product.attributes!['ownerName']!.options.first : TextUtilities.getArtistName(product.name),
         ownerType: OwnerType.woo,
         categories: List.from(product.categories.map((c) => c.name).toList()),
         tags: List.from(product.tags.map((t) => t.name).toList()),

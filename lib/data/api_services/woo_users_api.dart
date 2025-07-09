@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:neom_core/core/app_config.dart';
-import 'package:neom_core/core/domain/model/app_user.dart';
+import 'package:neom_core/app_config.dart';
+import 'package:neom_core/domain/model/app_user.dart';
 
 //TODO Working on it
 class WooUsersAPI {

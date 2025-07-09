@@ -1,21 +1,21 @@
 import 'dart:core';
 
 import 'package:get/get.dart';
-import 'package:neom_commons/commons/ui/theme/app_color.dart';
-import 'package:neom_commons/commons/utils/constants/app_page_id_constants.dart';
-import 'package:neom_commons/commons/utils/external_utilities.dart';
-import 'package:neom_core/core/app_config.dart';
-import 'package:neom_core/core/data/firestore/order_firestore.dart';
-import 'package:neom_core/core/data/firestore/transaction_firestore.dart';
-import 'package:neom_core/core/data/implementations/user_controller.dart';
-import 'package:neom_core/core/domain/model/app_order.dart';
-import 'package:neom_core/core/domain/model/app_product.dart';
-import 'package:neom_core/core/domain/model/app_profile.dart';
-import 'package:neom_core/core/domain/model/app_release_item.dart';
-import 'package:neom_core/core/domain/model/app_transaction.dart';
-import 'package:neom_core/core/utils/enums/app_currency.dart';
-import 'package:neom_core/core/utils/enums/transaction_status.dart';
-import 'package:neom_core/core/utils/enums/transaction_type.dart';
+import 'package:neom_commons/ui/theme/app_color.dart';
+import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
+import 'package:neom_commons/utils/external_utilities.dart';
+import 'package:neom_core/app_config.dart';
+import 'package:neom_core/data/firestore/order_firestore.dart';
+import 'package:neom_core/data/firestore/transaction_firestore.dart';
+import 'package:neom_core/data/implementations/user_controller.dart';
+import 'package:neom_core/domain/model/app_order.dart';
+import 'package:neom_core/domain/model/app_product.dart';
+import 'package:neom_core/domain/model/app_profile.dart';
+import 'package:neom_core/domain/model/app_release_item.dart';
+import 'package:neom_core/domain/model/app_transaction.dart';
+import 'package:neom_core/utils/enums/app_currency.dart';
+import 'package:neom_core/utils/enums/transaction_status.dart';
+import 'package:neom_core/utils/enums/transaction_type.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../domain/use_cases/woo_webview_service.dart';

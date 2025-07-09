@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:neom_core/core/app_config.dart';
-import 'package:neom_core/core/app_properties.dart';
+import 'package:neom_core/app_config.dart';
+import 'package:neom_core/app_properties.dart';
 
 import '../../domain/model/woo_product.dart';
 import '../../domain/model/woo_product_attribute.dart';
