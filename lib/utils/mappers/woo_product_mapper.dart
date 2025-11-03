@@ -32,11 +32,6 @@ class WooProductMapper {
         ownerType: OwnerType.woo,
         categories: List.from(product.categories.map((c) => c.name).toList()),
         tags: List.from(product.tags.map((t) => t.name).toList()),
-        // metaName = null,
-        // metaId = null,
-        // metaOwnerId = null,
-        // appMediaItemIds = null,
-        // instruments = null,
         lyrics: product.shortDescription,
         language: (product.attributes?.containsKey('language') ?? false) ? product.attributes!['language']!.options.first : '',
         digitalPrice: product.virtual ? Price(amount: product.regularPrice, currency: AppCurrency.mxn) : null,
@@ -45,15 +40,11 @@ class WooProductMapper {
         variations: product.variations,
         isRental: (product.attributes?.containsKey('isRental') ?? true) ? bool.parse(product.attributes!['isRental']!.options.first) : true,
         publishedYear: (product.attributes?.containsKey('publishedYear') ?? false) ? int.tryParse(product.attributes!['publishedYear']!.options.first) : null,
-        publisher: (product.attributes?.containsKey('publisher') ?? false) ? product.attributes!['publisher']!.options.first : null,
-        // place =  null,
-        // boughtUsers = null,
+        metaOwner: (product.attributes?.containsKey('metaOwner') ?? false) ? product.attributes!['metaOwner']!.options.first
+            : (product.attributes?.containsKey('publisher') ?? false) ? product.attributes!['publisher']!.options.first : null, ///REMOVE LOOKUP FOR PUBLISHER WHEN WOOCOMMERCE IS UPDATED
         createdTime: product.dateCreated?.millisecondsSinceEpoch ?? 0,
         modifiedTime: product.dateModified?.millisecondsSinceEpoch,
         state: 0,
-        // externalArtists = null,
-        // featInternalArtists = null,
-        // likedProfiles = null
         externalUrl: product.permalink,
         webPreviewUrl: (product.attributes?.containsKey('webPreviewUrl') ?? false) ? product.attributes!['webPreviewUrl']!.options.first : null
     );

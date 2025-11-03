@@ -10,7 +10,6 @@ import '../../domain/model/order/woo_billing.dart';
 import '../../domain/model/order/woo_order.dart';
 import '../../domain/model/order/woo_order_line_item.dart';
 import '../../domain/model/order/woo_shipping.dart';
-import '../../utils/constants/woo_constants.dart';
 import '../../utils/enums/woo_order_status.dart';
 import '../../utils/enums/woo_payment_method.dart';
 import 'woo_products_api.dart';
@@ -104,7 +103,7 @@ class WooOrdersAPI {
     if(variationId.isNotEmpty) {
       List<WooOrderLineItem> lineItems = [
         WooOrderLineItem(
-          productId: WooConstants.nupaleProductId,
+          productId: int.parse(AppProperties.getWooNupaleProdutId()),
           variationId: int.parse(variationId),
           quantity: quantity,
         )

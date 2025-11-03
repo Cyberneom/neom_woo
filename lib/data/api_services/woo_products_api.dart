@@ -211,7 +211,7 @@ class WooProductsAPI {
 
   static Future<String> getNupaleVariationId(String itemName) async {
 
-    WooProduct? nupaleProduct = await getProduct(WooConstants.nupaleProductId.toString());
+    WooProduct? nupaleProduct = await getProduct(AppProperties.getWooNupaleProdutId());
     List<WooProduct> variations = await getVariations(nupaleProduct!.id, searchParam: itemName.toLowerCase());
     String variationId = '';
 
@@ -256,7 +256,7 @@ class WooProductsAPI {
 
   static Future<String> getCaseteVariationId(String itemName) async {
 
-    WooProduct? caseteProduct = await getProduct(WooConstants.caseteProductId.toString());
+    WooProduct? caseteProduct = await getProduct(AppProperties.getWooCaseteProdutId());
     List<WooProduct> variations = await getVariations(caseteProduct!.id, searchParam: itemName.toLowerCase());
     String variationId = '';
 

@@ -5,11 +5,15 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/app_properties.dart';
+import 'package:neom_core/domain/use_cases/woo_media_service.dart';
 
-class WooMediaAPI {
+import '../../utils/constants/woo_constants.dart';
+
+class WooMediaAPI implements WooMediaService {
 
 
-  static Future<String> uploadMediaToWordPress(File file, {String fileName = ''}) async {
+  @override
+  Future<String> uploadMediaToWordPress(File file, {String fileName = ''}) async {
     AppConfig.logger.i("Uploading media file to WordPress");
 
     String url = '${AppProperties.getSiteUrl()}/wp-json/wp/v2/media';
@@ -52,15 +56,16 @@ class WooMediaAPI {
     return mediaUrl;
   }
 
-  static Future<String> getJwtToken() async {
-    String url = '${AppProperties.getSiteUrl()}/wp-json/jwt-auth/v1/token';
+  @override
+  Future<String> getJwtToken() async {
+    String url = '${AppProperties.getSiteUrl()}${WooConstants.jwtTokenUrl}';
 
     final response = await http.post(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'username': 'emmanuel.montoyae@gmail.com',
-        'password': '3mxi20l4!!',
+        WooConstants.username: AppProperties.getWooAccount(),
+        WooConstants.password: AppProperties.getWooPass(),
       }),
     );
 

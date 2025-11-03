@@ -1,6 +1,3 @@
-
-///THIS CATEGORIES ARE MATCHED WITH THE ID IN THE WOO SIDE
-///TO FILTER WHEN REQUESTING
 class WooAttributeConstants {
 
   static String previewUrl = 'previewUrl';
@@ -13,4 +10,5 @@ class WooAttributeConstants {
   static String productType = 'productType';
 
   static String itemName = 'itemName';
+
 }

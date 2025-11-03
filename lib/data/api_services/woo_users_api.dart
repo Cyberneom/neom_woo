@@ -28,7 +28,7 @@ class WooUsersAPI {
     }
   }
 
-  // Future<void> crearCuentaWordPress(String nombre, String email, String password) async {
+  // Future<void> createWordpressAccount(String nombre, String email, String password) async {
   //   final url = 'https://tu-sitio.com/wp-json/wc/v3/customers';
   //   final apiKey = 'tu_consumer_key';
   //   final apiSecret = 'tu_consumer_secret';

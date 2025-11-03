@@ -5,14 +5,15 @@ import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/external_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/data/firestore/order_firestore.dart';
 import 'package:neom_core/data/firestore/transaction_firestore.dart';
-import 'package:neom_core/data/implementations/user_controller.dart';
 import 'package:neom_core/domain/model/app_order.dart';
 import 'package:neom_core/domain/model/app_product.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
 import 'package:neom_core/domain/model/app_transaction.dart';
+import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/enums/app_currency.dart';
 import 'package:neom_core/utils/enums/transaction_status.dart';
 import 'package:neom_core/utils/enums/transaction_type.dart';
@@ -23,7 +24,7 @@ import '../utils/constants/woo_constants.dart';
 
 class WooWebViewController extends GetxController implements WooWebViewService {
 
-  final userController = Get.find<UserController>();
+  final userServiceImpl = Get.find<UserService>();
 
   AppProfile profile = AppProfile();
   AppReleaseItem releaseItem = AppReleaseItem();
@@ -45,11 +46,11 @@ class WooWebViewController extends GetxController implements WooWebViewService {
     AppConfig.logger.i("WooWebView Controller Init");
 
 
-    if(clearCache) webViewController.clearCache();
-    if(clearCookies) await ExternalUtilities.clearWebViewCookies();
 
     try {
-      profile = userController.user.profiles.first;
+      const String userAgent = 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36';
+
+      profile = userServiceImpl.user.profiles.first;
 
       if(Get.arguments != null && Get.arguments.isNotEmpty) {
         if (Get.arguments[0] is String) {
@@ -64,6 +65,17 @@ class WooWebViewController extends GetxController implements WooWebViewService {
 
       webViewController.setBackgroundColor(AppColor.main50);
       webViewController.loadRequest(Uri.parse(url));
+
+      // Load the URL with the User-Agent header
+      webViewController.loadRequest(
+        Uri.parse(url),
+        headers: {'User-Agent': userAgent},
+      );
+
+      if(clearCache) webViewController.clearCache();
+      if(clearCookies) webViewController.clearLocalStorage();
+      if(clearCookies) await ExternalUtilities.clearWebViewCookies();
+
     } catch (e) {
       AppConfig.logger.e(e.toString());
     }
@@ -73,7 +85,7 @@ class WooWebViewController extends GetxController implements WooWebViewService {
   @override
   void onReady() async {
     super.onReady();
-
+    
     webViewController.setJavaScriptMode(JavaScriptMode.unrestricted);
     webViewController.setNavigationDelegate(
       NavigationDelegate(
@@ -100,7 +112,7 @@ class WooWebViewController extends GetxController implements WooWebViewService {
 
             if(url.contains(WooConstants.checkout)) {
               await webViewController.runJavaScript(
-                "document.getElementById('billing_email').value = '${userController.user.email}';"
+                "document.getElementById('billing_email').value = '${userServiceImpl.user.email}';"
 
               );
             }
@@ -119,21 +131,23 @@ class WooWebViewController extends GetxController implements WooWebViewService {
         },
         onNavigationRequest: (NavigationRequest request) async {
           AppConfig.logger.d('Navigation Request for URL: ${request.url}');
-          if (request.url == url || WooConstants.allowedUrls.any((allowedUrl) => request.url.contains(allowedUrl))) {
+          if (request.url == url || request.url.contains(AppProperties.getSiteUrl())
+              || WooConstants.allowedUrls.any((allowedUrl) => request.url.contains(allowedUrl))) {
             canPopWebView = false;
             update([AppPageIdConstants.wooWebView]);
 
             if(request.url.contains(WooConstants.ordenRecibida) && !request.url.contains(WooConstants.paypal)) {
               url = request.url;
               String wooOrderId = await createInternalOrder();
-              userController.addOrderId(wooOrderId);
-              if(isDigital) userController.addBoughtItem(releaseItem.id);
+              userServiceImpl.addOrderId(wooOrderId);
+              if(isDigital) userServiceImpl.addBoughtItem(releaseItem.id);
+            } else if(request.url.contains(WooConstants.captcha)) {
+              webViewController.setBackgroundColor(AppColor.white);
             }
 
             AppConfig.logger.d('Navigating URL: ${request.url}');
             return NavigationDecision.navigate;
           } else {
-            // Navigator.pop(context);
             AppConfig.logger.d('Preventing URL: ${request.url}');
             return NavigationDecision.prevent;
           }
@@ -141,7 +155,6 @@ class WooWebViewController extends GetxController implements WooWebViewService {
       ),
     );
 
-    // update([AppPageIdConstants.wooWebView]);
   }
 
   @override
@@ -174,7 +187,7 @@ class WooWebViewController extends GetxController implements WooWebViewService {
         description: releaseItem.name,
         url: url,
         createdTime: DateTime.now().millisecondsSinceEpoch,
-        customerEmail: userController.user.email,
+        customerEmail: userServiceImpl.user.email,
         product: AppProduct.fromReleaseItem(releaseItem),
         invoiceIds: [url],
       );
@@ -185,7 +198,7 @@ class WooWebViewController extends GetxController implements WooWebViewService {
             type: TransactionType.purchase,
             orderId: orderId,
             createdTime: DateTime.now().millisecondsSinceEpoch,
-            senderId: userController.user.email,
+            senderId: userServiceImpl.user.email,
             status: TransactionStatus.completed,
             amount: releaseItem.salePrice?.amount ?? 0,
             currency: releaseItem.salePrice?.currency ?? AppCurrency.appCoin,
