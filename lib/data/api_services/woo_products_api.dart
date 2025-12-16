@@ -28,7 +28,10 @@ class WooProductsAPI {
       final response = await http.get(
         Uri.parse(url),
         headers: {
-          'Authorization': 'Basic $credentials'
+          'Authorization': 'Basic $credentials',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': '${AppProperties.getAppName()}/1.0 (+${AppProperties.getSiteUrl()})'
         },
       );
 
@@ -42,9 +45,17 @@ class WooProductsAPI {
         
         AppConfig.logger.d('${products.length} Products retrieved');
       } else {
-        AppConfig.logger.w(response.body.toString());
-        jsonDecode(response.body);
-        throw Exception('Error al cargar productos');
+        final contentType = response.headers['content-type'] ?? '';
+
+        if (contentType.contains('application/json')) {
+          AppConfig.logger.w(response.body.toString());
+          throw Exception('Error al cargar productos');
+        } else {
+          AppConfig.logger.e('Respuesta NO JSON (posible captcha SG)');
+          throw Exception('Respuesta bloqueada por seguridad del servidor');
+        }
+
+
       }
     } catch (e) {
       AppConfig.logger.e(e.toString());

@@ -15,27 +15,33 @@ import '../../domain/model/woo_product.dart';
 import '../../utils/constants/woo_attribute_constants.dart';
 import '../../utils/mappers/woo_product_mapper.dart';
 import '../api_services/woo_products_api.dart';
+import '../functions/woo_firebase_functions.dart';
 
 class WooGatewayController implements WooGatewayService {
 
   @override
-  Future<void> createProductFromReleaseItem(AppReleaseItem releaseItem) {
+  Future<void> createProductFromReleaseItem(AppReleaseItem releaseItem, {fromFunctions = false}) {
     // TODO: implement createProductFromReleaseItem
     throw UnimplementedError();
   }
 
   @override
-  Future<AppReleaseItem?> getProductAsReleaseItem(String productId) {
+  Future<AppReleaseItem?> getProductAsReleaseItem(String productId, {fromFunctions = false}) {
     // TODO: implement getProductAsReleaseItem
     throw UnimplementedError();
   }
 
   @override
-  Future<Map<ProductType, Map<int, AppReleaseItem>>> getProductsAsReleaseItems({int perPage = 25, int page = 1, List<String> categoryIds = const []}) async {
+  Future<Map<ProductType, Map<int, AppReleaseItem>>> getProductsAsReleaseItems({int perPage = 25, int page = 1, List<String> categoryIds = const [], fromFunctions = false}) async {
 
     ProductType productType = ProductType.digital;
 
-    List<WooProduct> wooProducts = await WooProductsAPI.getProducts(perPage: perPage, categoryIds: categoryIds);
+    List<WooProduct> wooProducts = [];
+    if(fromFunctions) {
+      wooProducts = await WooFirebaseFunctions.getProducts(perPage: perPage, categoryIds: categoryIds);
+    } else {
+      wooProducts = await WooProductsAPI.getProducts(perPage: perPage, categoryIds: categoryIds);
+    }
 
     Map<ProductType, Map<int, AppReleaseItem>> categorizedReleaseItems = {
       ProductType.appCoin: {},
