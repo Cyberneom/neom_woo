@@ -1,6 +1,6 @@
 name: neom_woo
 description: Woo Commerce Integration for Open Neom.
-version: 1.1.0
+version: 1.1.1
 homepage: https://github.com/Cyberneom/neom_woo
 publish_to: 'none'
 
