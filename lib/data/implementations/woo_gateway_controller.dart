@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:enum_to_string/enum_to_string.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
@@ -32,7 +32,9 @@ class WooGatewayController implements WooGatewayService {
   }
 
   @override
-  Future<Map<ProductType, Map<int, AppReleaseItem>>> getProductsAsReleaseItems({int perPage = 25, int page = 1, List<String> categoryIds = const [], fromFunctions = false}) async {
+  Future<Map<ProductType, Map<int, AppReleaseItem>>> getProductsAsReleaseItems({
+    int perPage = 25, int page = 1, List<String> categoryIds = const [],
+    fromFunctions = false}) async {
 
     ProductType productType = ProductType.digital;
 

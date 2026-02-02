@@ -1,6 +1,6 @@
 import 'dart:core';
 
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/external_utilities.dart';
@@ -22,9 +22,9 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../domain/use_cases/woo_webview_service.dart';
 import '../utils/constants/woo_constants.dart';
 
-class WooWebViewController extends GetxController implements WooWebViewService {
+class WooWebViewController extends SintController implements WooWebViewService {
 
-  final userServiceImpl = Get.find<UserService>();
+  final userServiceImpl = Sint.find<UserService>();
 
   AppProfile profile = AppProfile();
   AppReleaseItem releaseItem = AppReleaseItem();
@@ -52,13 +52,13 @@ class WooWebViewController extends GetxController implements WooWebViewService {
 
       profile = userServiceImpl.user.profiles.first;
 
-      if(Get.arguments != null && Get.arguments.isNotEmpty) {
-        if (Get.arguments[0] is String) {
-          url = Get.arguments[0];
+      if(Sint.arguments != null && Sint.arguments.isNotEmpty) {
+        if (Sint.arguments[0] is String) {
+          url = Sint.arguments[0];
         }
 
-        if(Get.arguments[1] != null && Get.arguments[1] is AppReleaseItem) {
-          releaseItem = Get.arguments[1];
+        if(Sint.arguments[1] != null && Sint.arguments[1] is AppReleaseItem) {
+          releaseItem = Sint.arguments[1];
           isDigital = releaseItem.physicalPrice == null;
         }
       }
