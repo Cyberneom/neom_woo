@@ -63,25 +63,33 @@ class WooProductsAPI {
     return products;
   }
 
-  static Future<void> createProduct(WooProduct product) async {
-
+  /// Creates a new WooCommerce product and returns the created product with its ID and permalink
+  static Future<WooProduct?> createProduct(WooProduct product) async {
     String url = '${AppProperties.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
+    String credentials = base64Encode(
+        utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
 
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Basic $credentials',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(product.toJSON()),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Basic $credentials',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(product.toJSON()),
+      );
 
-    if (response.statusCode == 201) {
-      AppConfig.logger.i('Producto creado correctamente');
-    } else {
-      AppConfig.logger.i('Error al crear el producto: ${response.body}');
+      if (response.statusCode == 201) {
+        AppConfig.logger.i('WooProduct created successfully');
+        final data = jsonDecode(response.body);
+        return WooProduct.fromJSON(data);
+      } else {
+        AppConfig.logger.e('Error creating WooProduct: ${response.body}');
+      }
+    } catch (e) {
+      AppConfig.logger.e('Exception creating WooProduct: $e');
     }
+    return null;
   }
 
   static Future<void> addAttributesToProduct(String productId, List<WooProductAttribute> attributes, {bool isNew = false}) async {
@@ -288,6 +296,101 @@ class WooProductsAPI {
     }
 
     return variationId;
+  }
+
+  /// Fetches all product categories from WooCommerce
+  static Future<List<Map<String, dynamic>>> getCategories({int perPage = 100}) async {
+    String url = '${AppProperties.getWooUrl()}/products/categories?per_page=$perPage';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
+
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Basic $credentials',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        AppConfig.logger.e('Error fetching categories: ${response.statusCode}');
+      }
+    } catch (e) {
+      AppConfig.logger.e('Exception fetching categories: $e');
+    }
+    return [];
+  }
+
+  /// Creates a new product category in WooCommerce
+  /// Returns the created category data with its ID
+  static Future<Map<String, dynamic>?> createCategory(String name, String slug) async {
+    String url = '${AppProperties.getWooUrl()}/products/categories';
+    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Basic $credentials',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'name': name, 'slug': slug}),
+      );
+
+      if (response.statusCode == 201) {
+        AppConfig.logger.i('Category "$name" created successfully');
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        final body = jsonDecode(response.body);
+        // If category already exists (term_exists error), try to extract existing ID
+        if (body['code'] == 'term_exists' && body['data'] != null) {
+          AppConfig.logger.i('Category "$name" already exists with ID: ${body['data']['resource_id']}');
+          return {'id': body['data']['resource_id'], 'name': name, 'slug': slug};
+        }
+        AppConfig.logger.e('Error creating category "$name": ${response.body}');
+      }
+    } catch (e) {
+      AppConfig.logger.e('Exception creating category "$name": $e');
+    }
+    return null;
+  }
+
+  /// Resolves a list of category names to WooProductCategory with valid IDs.
+  /// Fetches existing categories first, creates any that don't exist.
+  static Future<List<Map<String, dynamic>>> resolveCategories(List<String> categoryNames, List<String> categorySlugs) async {
+    if (categoryNames.isEmpty) return [];
+
+    // Fetch all existing categories
+    final existingCategories = await getCategories();
+    final Map<String, int> slugToId = {};
+    for (final cat in existingCategories) {
+      slugToId[(cat['slug'] as String? ?? '').toLowerCase()] = cat['id'] as int? ?? 0;
+    }
+
+    final List<Map<String, dynamic>> resolvedCategories = [];
+
+    for (int i = 0; i < categoryNames.length; i++) {
+      final name = categoryNames[i];
+      final slug = i < categorySlugs.length ? categorySlugs[i] : name.toLowerCase().replaceAll(' ', '-');
+
+      final existingId = slugToId[slug.toLowerCase()];
+      if (existingId != null && existingId > 0) {
+        // Category exists — use its ID
+        resolvedCategories.add({'id': existingId, 'name': name, 'slug': slug});
+        AppConfig.logger.t('Category "$name" resolved to existing ID: $existingId');
+      } else {
+        // Category doesn't exist — create it
+        final created = await createCategory(name, slug);
+        if (created != null) {
+          resolvedCategories.add(created);
+        }
+      }
+    }
+
+    return resolvedCategories;
   }
 
   static Future<String> createCaseteVariation(WooProduct caseteProduct, String itemName) async {

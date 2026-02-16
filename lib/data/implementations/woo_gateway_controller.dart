@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:enum_to_string/enum_to_string.dart';
-import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
@@ -10,8 +8,10 @@ import 'package:neom_core/domain/use_cases/woo_gateway_service.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
 import 'package:neom_core/utils/enums/product_type.dart';
 import 'package:neom_core/utils/enums/release_type.dart';
+import 'package:sint/sint.dart';
 
 import '../../domain/model/woo_product.dart';
+import '../../domain/model/woo_product_category.dart';
 import '../../utils/constants/woo_attribute_constants.dart';
 import '../../utils/mappers/woo_product_mapper.dart';
 import '../api_services/woo_products_api.dart';
@@ -20,9 +20,62 @@ import '../functions/woo_firebase_functions.dart';
 class WooGatewayController implements WooGatewayService {
 
   @override
-  Future<void> createProductFromReleaseItem(AppReleaseItem releaseItem, {fromFunctions = false}) {
-    // TODO: implement createProductFromReleaseItem
-    throw UnimplementedError();
+  Future<Map<String, String>?> createProductFromReleaseItem(
+    AppReleaseItem releaseItem, {
+    bool fromFunctions = false,
+    String? coverImageUrl,
+    String? downloadFileUrl,
+  }) async {
+    try {
+      AppConfig.logger.d('Creating WooProduct from AppReleaseItem: ${releaseItem.name}');
+
+      final wooProduct = WooProductMapper.fromAppReleaseItem(
+        releaseItem,
+        coverImageUrl: coverImageUrl,
+        downloadFileUrl: downloadFileUrl,
+      );
+
+      // Resolve category IDs: find existing or create new categories in WooCommerce
+      if (wooProduct.categories.isNotEmpty) {
+        final categoryNames = wooProduct.categories.map((c) => c.name).toList();
+        final categorySlugs = wooProduct.categories.map((c) => c.slug).toList();
+        final resolvedCategories = await WooProductsAPI.resolveCategories(categoryNames, categorySlugs);
+
+        wooProduct.categories = resolvedCategories.map((cat) => WooProductCategory(
+          id: cat['id'] as int? ?? 0,
+          name: cat['name'] as String? ?? '',
+          slug: cat['slug'] as String? ?? '',
+        )).toList();
+
+        AppConfig.logger.d('Resolved ${wooProduct.categories.length} categories with IDs');
+      }
+
+      final createdProduct = await WooProductsAPI.createProduct(wooProduct);
+
+      if (createdProduct != null) {
+        AppConfig.logger.i(
+            'WooProduct created with ID: ${createdProduct.id}, permalink: ${createdProduct.permalink}');
+
+        // Add custom attributes after product creation
+        if (wooProduct.attributes?.isNotEmpty ?? false) {
+          await WooProductsAPI.addAttributesToProduct(
+            createdProduct.id.toString(),
+            wooProduct.attributes!.values.toList(),
+            isNew: true,
+          );
+        }
+
+        return {
+          'id': createdProduct.id.toString(),
+          'permalink': createdProduct.permalink,
+        };
+      }
+
+      return null;
+    } catch (e) {
+      AppConfig.logger.e('Error creating WooProduct from AppReleaseItem: $e');
+      return null;
+    }
   }
 
   @override

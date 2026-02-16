@@ -13,9 +13,9 @@ class WooProductDownload {
   // Factory constructor for creating a new WooProductDownloads instance from a JSON map
   factory WooProductDownload.fromJson(Map<String, dynamic> json) {
     return WooProductDownload(
-      id: json['id'] as String?,
-      name: json['name'] as String?,
-      file: json['file'] as String?,
+      id: json['id']?.toString(),
+      name: json['name']?.toString(),
+      file: json['file']?.toString(),
     );
   }
 

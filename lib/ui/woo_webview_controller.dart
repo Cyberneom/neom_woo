@@ -1,6 +1,3 @@
-import 'dart:core';
-
-import 'package:sint/sint.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/external_utilities.dart';
@@ -17,6 +14,7 @@ import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/enums/app_currency.dart';
 import 'package:neom_core/utils/enums/transaction_status.dart';
 import 'package:neom_core/utils/enums/transaction_type.dart';
+import 'package:sint/sint.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../domain/use_cases/woo_webview_service.dart';

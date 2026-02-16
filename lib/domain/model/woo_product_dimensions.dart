@@ -9,11 +9,12 @@ class WooProductDimensions {
     this.height = 0,
   });
 
-  factory WooProductDimensions.fromJSON(Map<String, dynamic> json) {
+  factory WooProductDimensions.fromJSON(Map<String, dynamic>? json) {
+    if (json == null) return WooProductDimensions();
     return WooProductDimensions(
-      length: double.tryParse(json['length'] ?? '') ?? 0.0,
-      width: double.tryParse(json['width'] ?? '') ?? 0.0,
-      height: double.tryParse(json['height'] ?? '') ?? 0.0,
+      length: double.tryParse(json['length']?.toString() ?? '') ?? 0.0,
+      width: double.tryParse(json['width']?.toString() ?? '') ?? 0.0,
+      height: double.tryParse(json['height']?.toString() ?? '') ?? 0.0,
     );
   }
 
