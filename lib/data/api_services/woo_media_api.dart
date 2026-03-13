@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/app_properties.dart';
+import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/domain/use_cases/woo_media_service.dart';
 
 import '../../utils/constants/woo_constants.dart';
@@ -85,6 +87,7 @@ class WooMediaAPI implements WooMediaService {
       String jwtToken = await getJwtToken();
       request.headers['Authorization'] = 'Bearer $jwtToken';
       request.headers['Content-Disposition'] = 'attachment; filename="$sanitizedFilename"';
+      request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
       // Envía la solicitud
       var response = await request.send();
@@ -108,14 +111,24 @@ class WooMediaAPI implements WooMediaService {
 
   @override
   Future<String> getJwtToken() async {
+    // On web, WordPress credentials are server-side only.
+    // Media uploads use wooMediaProxy via Cloud Functions instead.
+    if (CloudProperties.isSecureMode || kIsWeb) {
+      AppConfig.logger.w('getJwtToken skipped in secure mode — use wooMediaProxy');
+      return '';
+    }
+
     String url = '${AppProperties.getSiteUrl()}${WooConstants.jwtTokenUrl}';
 
     final response = await http.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      },
       body: jsonEncode({
-        WooConstants.username: AppProperties.getWooAccount(),
-        WooConstants.password: AppProperties.getWooPass(),
+        WooConstants.username: CloudProperties.getWooAccount(),
+        WooConstants.password: CloudProperties.getWooPass(),
       }),
     );
 

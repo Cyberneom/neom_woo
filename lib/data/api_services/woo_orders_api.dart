@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/app_properties.dart';
+import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/domain/model/app_user.dart';
 
 import '../../domain/model/order/woo_billing.dart';
@@ -14,14 +16,52 @@ import '../../utils/enums/woo_order_status.dart';
 import '../../utils/enums/woo_payment_method.dart';
 import 'woo_products_api.dart';
 
+/// WooCommerce Orders API.
+/// In secure mode (web), routes through Cloud Functions wooProxy.
+/// On mobile, calls WooCommerce directly with credentials.
 class WooOrdersAPI {
+
+  /// Central helper for WooCommerce order calls.
+  static Future<dynamic> _callWoo({
+    required String path,
+    String method = 'GET',
+    Map<String, dynamic>? body,
+  }) async {
+    if (CloudProperties.isSecureMode || kIsWeb) {
+      // Web: ALWAYS proxy — WooCommerce credentials are server-side only.
+      return CloudProperties.wooProxy(path: path, method: method, body: body);
+    }
+
+    // Mobile only: direct call
+    final url = '${AppProperties.getWooUrl()}$path';
+    final credentials = base64Encode(
+      utf8.encode('${CloudProperties.getWooClientKey()}:${CloudProperties.getWooClientSecret()}'),
+    );
+    final headers = <String, String>{
+      'Authorization': 'Basic $credentials',
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    };
+
+    late http.Response response;
+    switch (method.toUpperCase()) {
+      case 'POST':
+        response = await http.post(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
+        break;
+      default:
+        response = await http.get(Uri.parse(url), headers: headers);
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body);
+    }
+
+    AppConfig.logger.e('Woo order error (${response.statusCode}): ${response.body}');
+    return null;
+  }
 
   static Future<String> createOrder(String email, List<WooOrderLineItem> orderLineItems, {
     String? customerId, WooBilling? billingAddress, WooShipping? shippingAddress, WooOrderStatus orderStatus = WooOrderStatus.processing}) async {
-
-    String url = '${AppProperties.getWooUrl()}/orders';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
-
 
     WooOrder newOrder = WooOrder(
       paymentMethod: WooPaymentMethod.bacs.name,
@@ -32,26 +72,17 @@ class WooOrdersAPI {
       shipping: shippingAddress,
     );
 
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Basic $credentials',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(newOrder.toJson()),
-    );
-
     String orderId = '';
 
-    if (response.statusCode == 201) {
-      AppConfig.logger.i('Order created successfully!');
-      // Decodifica la respuesta JSON
-      final responseData = jsonDecode(response.body);
-      // Obtén el orderId de la respuesta
-      orderId = responseData['id'].toString();
-    } else {
-      AppConfig.logger.e('Failed to create order: ${response.statusCode}');
-      AppConfig.logger.e('Response: ${response.body}');
+    try {
+      final responseData = await _callWoo(path: '/orders', method: 'POST', body: newOrder.toJson());
+
+      if (responseData != null) {
+        AppConfig.logger.i('Order created successfully!');
+        orderId = responseData['id'].toString();
+      }
+    } catch (e) {
+      AppConfig.logger.e('Failed to create order: $e');
     }
 
     return orderId;
@@ -60,35 +91,22 @@ class WooOrdersAPI {
   static Future<List<WooOrder>> getOrders({perPage = 25, page = 1, WooOrderStatus? status}) async {
     AppConfig.logger.i('getOrders');
 
-    String url = '${AppProperties.getWooUrl()}/orders?page=$page&per_page=$perPage';
-    if(status != null) url = '$url&status=${status.name}';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
+    String path = '/orders?page=$page&per_page=$perPage';
+    if(status != null) path = '$path&status=${status.name}';
 
     List<WooOrder> wooOrders = [];
 
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Basic $credentials',
-        'Content-Type': 'application/json',
-      },
-    );
+    try {
+      final data = await _callWoo(path: path);
 
-    if (response.statusCode == 200) {
-      List<dynamic> ordersJson = jsonDecode(response.body);
-      AppConfig.logger.i(ordersJson.toString());
-      for (var json in ordersJson) {
-        WooOrder wooOrder = WooOrder.fromJson(json);
-        if(json['id'].toString() == '6364') {
-          AppConfig.logger.i("");
+      if (data is List) {
+        for (var json in data) {
+          WooOrder wooOrder = WooOrder.fromJson(json);
+          wooOrders.add(wooOrder);
         }
-        AppConfig.logger.i(json.toString());
-        wooOrders.add(wooOrder);
       }
-      // return ordersJson.map((orderJson) => WooOrder.fromJSON(orderJson)).toList();
-    } else {
-      AppConfig.logger.e('Failed to fetch orders: ${response.statusCode}');
-      AppConfig.logger.e('Response: ${response.body}');
+    } catch (e) {
+      AppConfig.logger.e('Failed to fetch orders: $e');
     }
 
     return wooOrders;

@@ -17,7 +17,7 @@ class WooWebViewPage extends StatelessWidget {
       id: AppPageIdConstants.wooWebView,
       init: WooWebViewController(),
       builder: (controller) => Scaffold(
-        backgroundColor: AppColor.main50,
+        backgroundColor: AppColor.scaffold,
         body: SafeArea(
           child: PopScope(
             canPop: false,

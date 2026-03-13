@@ -46,7 +46,7 @@ class WooWebViewController extends SintController implements WooWebViewService {
 
 
     try {
-      const String userAgent = 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36';
+      const String userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
       profile = userServiceImpl.user.profiles.first;
 
@@ -61,7 +61,7 @@ class WooWebViewController extends SintController implements WooWebViewService {
         }
       }
 
-      webViewController.setBackgroundColor(AppColor.main50);
+      webViewController.setBackgroundColor(AppColor.surfaceCard);
       webViewController.loadRequest(Uri.parse(url));
 
       // Load the URL with the User-Agent header

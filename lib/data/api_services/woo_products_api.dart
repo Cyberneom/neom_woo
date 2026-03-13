@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/app_properties.dart';
+import 'package:neom_core/cloud_properties.dart';
 
 import '../../domain/model/woo_product.dart';
 import '../../domain/model/woo_product_attribute.dart';
@@ -11,51 +13,82 @@ import '../../utils/constants/woo_attribute_constants.dart';
 import '../../utils/constants/woo_constants.dart';
 import '../../utils/enums/woo_product_status.dart';
 
+/// WooCommerce Products API.
+/// In secure mode (web), routes through Cloud Functions wooProxy.
+/// On mobile, calls WooCommerce directly with credentials.
 class WooProductsAPI {
+
+  /// Central helper for WooCommerce API calls.
+  /// In secure mode: proxies through Cloud Functions.
+  /// On mobile: direct HTTP with Basic auth.
+  static Future<dynamic> _callWoo({
+    required String path,
+    String method = 'GET',
+    Map<String, dynamic>? body,
+  }) async {
+    if (CloudProperties.isSecureMode || kIsWeb) {
+      // Web: ALWAYS proxy — WooCommerce credentials are server-side only.
+      return CloudProperties.wooProxy(path: path, method: method, body: body);
+    }
+
+    // Mobile only: direct call
+    final url = '${AppProperties.getWooUrl()}$path';
+    final credentials = base64Encode(
+      utf8.encode('${CloudProperties.getWooClientKey()}:${CloudProperties.getWooClientSecret()}'),
+    );
+    final headers = <String, String>{
+      'Authorization': 'Basic $credentials',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    };
+
+    late http.Response response;
+    switch (method.toUpperCase()) {
+      case 'POST':
+        response = await http.post(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
+        break;
+      case 'PUT':
+        response = await http.put(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
+        break;
+      default:
+        response = await http.get(Uri.parse(url), headers: headers);
+    }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body);
+    }
+
+    final contentType = response.headers['content-type'] ?? '';
+    if (!contentType.contains('application/json') || response.body.trim().startsWith('<')) {
+      AppConfig.logger.e('Woo response invalid (${response.statusCode})');
+      throw Exception('Respuesta bloqueada por seguridad del servidor');
+    }
+
+    AppConfig.logger.e('Woo error (${response.statusCode}): ${response.body}');
+    throw Exception('Error WooCommerce: ${response.statusCode}');
+  }
 
   static Future<List<WooProduct>> getProducts({int perPage = 25, int page = 1,
     WooProductStatus status = WooProductStatus.publish, List<String> categoryIds = const []}) async {
-    
-    String url = '${AppProperties.getWooUrl()}/products?page=$page&per_page=$perPage&status=${status.name}';
+
+    String path = '/products?page=$page&per_page=$perPage&status=${status.name}';
     if (categoryIds.isNotEmpty) {
-      String categoryParam = categoryIds.join(','); // Une los IDs con comas
-      url = '$url&category=$categoryParam';
+      path = '$path&category=${categoryIds.join(',')}';
     }
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
+
     List<WooProduct> products = [];
 
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Basic $credentials',
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'User-Agent': '${AppProperties.getAppName()}/1.0 (+${AppProperties.getSiteUrl()})'
-        },
-      );
+      final data = await _callWoo(path: path);
 
-      if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
-        for(var item in data.asMap().values) {
+      if (data is List) {
+        for (var item in data) {
           WooProduct product = WooProduct.fromJSON(item);
           AppConfig.logger.t('Product ${product.id} with name ${product.name}');
           products.add(product);
         }
-        
         AppConfig.logger.d('${products.length} Products retrieved');
-      } else {
-        final contentType = response.headers['content-type'] ?? '';
-
-        if (contentType.contains('application/json')) {
-          AppConfig.logger.w(response.body.toString());
-          throw Exception('Error al cargar productos');
-        } else {
-          AppConfig.logger.e('Respuesta NO JSON (posible captcha SG)');
-          throw Exception('Respuesta bloqueada por seguridad del servidor');
-        }
-
-
       }
     } catch (e) {
       AppConfig.logger.e(e.toString());
@@ -65,26 +98,12 @@ class WooProductsAPI {
 
   /// Creates a new WooCommerce product and returns the created product with its ID and permalink
   static Future<WooProduct?> createProduct(WooProduct product) async {
-    String url = '${AppProperties.getWooUrl()}/products';
-    String credentials = base64Encode(
-        utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
-
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Basic $credentials',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(product.toJSON()),
-      );
+      final data = await _callWoo(path: '/products', method: 'POST', body: product.toJSON());
 
-      if (response.statusCode == 201) {
+      if (data != null) {
         AppConfig.logger.i('WooProduct created successfully');
-        final data = jsonDecode(response.body);
         return WooProduct.fromJSON(data);
-      } else {
-        AppConfig.logger.e('Error creating WooProduct: ${response.body}');
       }
     } catch (e) {
       AppConfig.logger.e('Exception creating WooProduct: $e');
@@ -93,9 +112,6 @@ class WooProductsAPI {
   }
 
   static Future<void> addAttributesToProduct(String productId, List<WooProductAttribute> attributes, {bool isNew = false}) async {
-
-    String url = '${AppProperties.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
     int position = 0;
     try {
       List<WooProductAttribute> totalAttributes = [];
@@ -125,21 +141,19 @@ class WooProductsAPI {
         totalAttributes.add(attribute);
         position++;
       }
-      final response = await http.put(
-        Uri.parse('$url/$productId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Basic $credentials',
-        },
-        body: jsonEncode({
+
+      final data = await _callWoo(
+        path: '/products/$productId',
+        method: 'PUT',
+        body: {
           WooConstants.attributes: totalAttributes.map((attribute) => attribute.toJSON()).toList(),
-        }),
+        },
       );
 
-      if (response.statusCode == 200) {
+      if (data != null) {
         AppConfig.logger.i('Atributos agregados exitosamente');
       } else {
-        AppConfig.logger.i('Error al agregar atributos: ${response.statusCode}');
+        AppConfig.logger.i('Error al agregar atributos');
       }
     } catch (e) {
       AppConfig.logger.e(e.toString());
@@ -147,23 +161,12 @@ class WooProductsAPI {
   }
 
   static Future<WooProduct?> getProduct(String productId) async {
-
-    String url = '${AppProperties.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
-
     WooProduct? product;
     try {
-      final response = await http.get(
-        Uri.parse('$url/$productId'),
-        headers: {
-          'Authorization': 'Basic $credentials',
-        },
-      );
+      final data = await _callWoo(path: '/products/$productId');
 
-      if (response.statusCode == 200) {
-        product = WooProduct.fromJSON(jsonDecode(response.body));
-      } else {
-        AppConfig.logger.i('Error al obtener atributos: ${response.statusCode}');
+      if (data != null) {
+        product = WooProduct.fromJSON(data);
       }
     } catch (e) {
       AppConfig.logger.e(e.toString());
@@ -173,21 +176,18 @@ class WooProductsAPI {
   }
 
   static Future<List<WooProduct>> getVariations(int productId, {int perPage = 100, int page = 1, String searchParam = ''}) async {
-
-    String url = '${AppProperties.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
     List<WooProduct> productVariations = [];
 
-    final response = await http.get(
-      Uri.parse('$url/$productId/variations?page=$page&per_page=$perPage&search=${Uri.encodeComponent(searchParam)}'),
-      headers: {
-        'Authorization': 'Basic $credentials',
-      },
-    );
+    try {
+      final data = await _callWoo(
+        path: '/products/$productId/variations?page=$page&per_page=$perPage&search=${Uri.encodeComponent(searchParam)}',
+      );
 
-    if (response.statusCode == 200) {
-      List variations = json.decode(response.body);
-      productVariations = variations.map((variation) => WooProduct.fromJSON(variation)).toList();
+      if (data is List) {
+        productVariations = data.map((variation) => WooProduct.fromJSON(variation)).toList();
+      }
+    } catch (e) {
+      AppConfig.logger.e(e.toString());
     }
 
     return productVariations;
@@ -195,35 +195,29 @@ class WooProductsAPI {
 
   // Crear una nueva variación si no existe
   static Future<String> createVariation(String productId, String attributeName, String optionValue, {String sku = ''}) async {
+    try {
+      final data = await _callWoo(
+        path: '/products/$productId/variations',
+        method: 'POST',
+        body: {
+          'attributes': [
+            {
+              'name': attributeName,
+              'option': optionValue,
+            },
+          ],
+          'sku': Uri.encodeComponent('$productId-${optionValue.toUpperCase()}'),
+          'virtual': true,
+          'regular_price': '0.00',
+        },
+      );
 
-    String url = '${AppProperties.getWooUrl()}/products';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
-
-    final response = await http.post(
-      Uri.parse('$url/$productId/variations'),
-      headers: {
-        'Authorization': 'Basic $credentials',
-        'Content-Type': 'application/json',
-      },
-      body: json.encode({
-        'attributes': [
-          {
-            'name': attributeName,
-            'option': optionValue,
-          },
-        ],
-        'sku': Uri.encodeComponent('$productId-${optionValue.toUpperCase()}'),
-        'virtual': true,
-        'regular_price': '0.00', // Establece el precio si es necesario
-      }),
-    );
-
-    if (response.statusCode == 201) {
-      AppConfig.logger.i('Variation was created');
-      final variation = json.decode(response.body);
-      return variation['id'].toString();
-    } else {
-      AppConfig.logger.e('Error creating variation: ${response.statusCode}');
+      if (data != null) {
+        AppConfig.logger.i('Variation was created');
+        return data['id'].toString();
+      }
+    } catch (e) {
+      AppConfig.logger.e('Error creating variation: $e');
     }
     return '';
   }
@@ -300,23 +294,11 @@ class WooProductsAPI {
 
   /// Fetches all product categories from WooCommerce
   static Future<List<Map<String, dynamic>>> getCategories({int perPage = 100}) async {
-    String url = '${AppProperties.getWooUrl()}/products/categories?per_page=$perPage';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
-
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Basic $credentials',
-          'Content-Type': 'application/json',
-        },
-      );
+      final data = await _callWoo(path: '/products/categories?per_page=$perPage');
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+      if (data is List) {
         return data.cast<Map<String, dynamic>>();
-      } else {
-        AppConfig.logger.e('Error fetching categories: ${response.statusCode}');
       }
     } catch (e) {
       AppConfig.logger.e('Exception fetching categories: $e');
@@ -327,33 +309,25 @@ class WooProductsAPI {
   /// Creates a new product category in WooCommerce
   /// Returns the created category data with its ID
   static Future<Map<String, dynamic>?> createCategory(String name, String slug) async {
-    String url = '${AppProperties.getWooUrl()}/products/categories';
-    String credentials = base64Encode(utf8.encode('${AppProperties.getWooClientKey()}:${AppProperties.getWooClientSecret()}'));
-
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Basic $credentials',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'name': name, 'slug': slug}),
+      final data = await _callWoo(
+        path: '/products/categories',
+        method: 'POST',
+        body: {'name': name, 'slug': slug},
       );
 
-      if (response.statusCode == 201) {
+      if (data != null) {
         AppConfig.logger.i('Category "$name" created successfully');
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      } else {
-        final body = jsonDecode(response.body);
-        // If category already exists (term_exists error), try to extract existing ID
-        if (body['code'] == 'term_exists' && body['data'] != null) {
-          AppConfig.logger.i('Category "$name" already exists with ID: ${body['data']['resource_id']}');
-          return {'id': body['data']['resource_id'], 'name': name, 'slug': slug};
-        }
-        AppConfig.logger.e('Error creating category "$name": ${response.body}');
+        return data as Map<String, dynamic>;
       }
     } catch (e) {
-      AppConfig.logger.e('Exception creating category "$name": $e');
+      // Check if category already exists
+      final errorStr = e.toString();
+      if (errorStr.contains('term_exists')) {
+        AppConfig.logger.i('Category "$name" already exists');
+      } else {
+        AppConfig.logger.e('Exception creating category "$name": $e');
+      }
     }
     return null;
   }
