@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/cloud_properties.dart';
 
@@ -90,8 +91,8 @@ class WooProductsAPI {
         }
         AppConfig.logger.d('${products.length} Products retrieved');
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'getProducts');
     }
     return products;
   }
@@ -105,8 +106,8 @@ class WooProductsAPI {
         AppConfig.logger.i('WooProduct created successfully');
         return WooProduct.fromJSON(data);
       }
-    } catch (e) {
-      AppConfig.logger.e('Exception creating WooProduct: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'createProduct');
     }
     return null;
   }
@@ -155,8 +156,8 @@ class WooProductsAPI {
       } else {
         AppConfig.logger.i('Error al agregar atributos');
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'addAttributesToProduct');
     }
   }
 
@@ -168,8 +169,8 @@ class WooProductsAPI {
       if (data != null) {
         product = WooProduct.fromJSON(data);
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'getProduct');
     }
 
     return product;
@@ -186,8 +187,8 @@ class WooProductsAPI {
       if (data is List) {
         productVariations = data.map((variation) => WooProduct.fromJSON(variation)).toList();
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'getVariations');
     }
 
     return productVariations;
@@ -216,8 +217,8 @@ class WooProductsAPI {
         AppConfig.logger.i('Variation was created');
         return data['id'].toString();
       }
-    } catch (e) {
-      AppConfig.logger.e('Error creating variation: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'createVariation');
     }
     return '';
   }
@@ -300,8 +301,8 @@ class WooProductsAPI {
       if (data is List) {
         return data.cast<Map<String, dynamic>>();
       }
-    } catch (e) {
-      AppConfig.logger.e('Exception fetching categories: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'getCategories');
     }
     return [];
   }
@@ -320,13 +321,13 @@ class WooProductsAPI {
         AppConfig.logger.i('Category "$name" created successfully');
         return data as Map<String, dynamic>;
       }
-    } catch (e) {
+    } catch (e, st) {
       // Check if category already exists
       final errorStr = e.toString();
       if (errorStr.contains('term_exists')) {
         AppConfig.logger.i('Category "$name" already exists');
       } else {
-        AppConfig.logger.e('Exception creating category "$name": $e');
+        NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'createCategory');
       }
     }
     return null;

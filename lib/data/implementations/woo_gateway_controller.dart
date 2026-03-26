@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:enum_to_string/enum_to_string.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
 import 'package:neom_core/domain/use_cases/woo_gateway_service.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
@@ -72,8 +73,8 @@ class WooGatewayController implements WooGatewayService {
       }
 
       return null;
-    } catch (e) {
-      AppConfig.logger.e('Error creating WooProduct from AppReleaseItem: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'createProductFromReleaseItem');
       return null;
     }
   }

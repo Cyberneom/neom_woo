@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/domain/use_cases/woo_media_service.dart';
@@ -102,8 +103,8 @@ class WooMediaAPI implements WooMediaService {
         AppConfig.logger.e('Failed to upload media: ${response.statusCode}');
         AppConfig.logger.e('Response: ${await response.stream.bytesToString()}');
       }
-    } catch (e) {
-      AppConfig.logger.e('Error uploading media: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'uploadMediaToWordPress');
     }
 
     return mediaUrl;

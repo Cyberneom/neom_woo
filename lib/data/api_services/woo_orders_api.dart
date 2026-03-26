@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/domain/model/app_user.dart';
@@ -81,8 +82,8 @@ class WooOrdersAPI {
         AppConfig.logger.i('Order created successfully!');
         orderId = responseData['id'].toString();
       }
-    } catch (e) {
-      AppConfig.logger.e('Failed to create order: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'createOrder');
     }
 
     return orderId;
@@ -105,8 +106,8 @@ class WooOrdersAPI {
           wooOrders.add(wooOrder);
         }
       }
-    } catch (e) {
-      AppConfig.logger.e('Failed to fetch orders: $e');
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'getOrders');
     }
 
     return wooOrders;

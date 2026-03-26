@@ -2,6 +2,7 @@ import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/external_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/data/firestore/order_firestore.dart';
 import 'package:neom_core/data/firestore/transaction_firestore.dart';
@@ -74,8 +75,8 @@ class WooWebViewController extends SintController implements WooWebViewService {
       if(clearCookies) webViewController.clearLocalStorage();
       if(clearCookies) await ExternalUtilities.clearWebViewCookies();
 
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'onInit');
     }
 
   }
@@ -116,8 +117,8 @@ class WooWebViewController extends SintController implements WooWebViewService {
             }
             isLoading = false;
             update([AppPageIdConstants.wooWebView]);
-          } catch(e) {
-            AppConfig.logger.e(e.toString());
+          } catch(e, st) {
+            NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'onPageFinished');
           }
 
         },
