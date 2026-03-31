@@ -1,3 +1,15 @@
+### 1.1.1 - Module Sync & Updates
+- Sync module with latest ecosystem changes
+- Update dependencies and internal references
+
+### 1.1.0 - SINT Integration & Bug Fixes
+- Integrate SINT framework — migrate from deprecated GetX API
+- Fix WooProduct parsing for int/String type coercion
+- Fix price serialization
+- Return ID and permalink from product create
+- Update freezed_annotation to 3.1.0
+- Fix captcha-related issues
+
 ### 1.0.0 - Initial Release & E-commerce Gateway Specialization
 This release marks the initial official release (v1.0.0) of neom_woo as a new, independent module within the Open Neom ecosystem. This module is introduced to centralize all logic and functionalities related to the WooCommerce and WordPress APIs, serving as the official e-commerce gateway for the platform.
 
