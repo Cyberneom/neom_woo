@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/external_utilities.dart';
@@ -110,8 +112,11 @@ class WooWebViewController extends SintController implements WooWebViewService {
             );
 
             if(url.contains(WooConstants.checkout)) {
+              // SECURITY (M4): jsonEncode produces a properly escaped JS string
+              // literal — a quote in the email can no longer break out and
+              // inject arbitrary JavaScript into the checkout page.
               await webViewController.runJavaScript(
-                "document.getElementById('billing_email').value = '${userServiceImpl.user.email}';"
+                "document.getElementById('billing_email').value = ${jsonEncode(userServiceImpl.user.email)};"
 
               );
             }
@@ -131,7 +136,7 @@ class WooWebViewController extends SintController implements WooWebViewService {
         onNavigationRequest: (NavigationRequest request) async {
           AppConfig.logger.d('Navigation Request for URL: ${request.url}');
           if (request.url == url || request.url.contains(AppProperties.getSiteUrl())
-              || WooConstants.allowedUrls.any((allowedUrl) => request.url.contains(allowedUrl))) {
+              || _matchesAllowedUrl(request.url)) {
             canPopWebView = false;
             update([AppPageIdConstants.wooWebView]);
 
@@ -160,6 +165,19 @@ class WooWebViewController extends SintController implements WooWebViewService {
   void setCanPopWebView(bool canPop) {
     canPopWebView = canPop;
     update([AppPageIdConstants.wooWebView]);
+  }
+
+  /// SECURITY (M4): matches the allowlist against the URL's host + path only.
+  /// Previously a raw substring check over the whole URL let crafted links
+  /// like 'https://evil.com/?next=checkout' through the gate. Legitimate
+  /// WooCommerce/PayPal/Stripe URLs carry the keyword in the host or path
+  /// ('/carrito', '/checkout', '/orden-recibida', 'www.paypal.com', …),
+  /// so behavior for real flows is unchanged.
+  bool _matchesAllowedUrl(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return false;
+    final hostAndPath = '${uri.host}${uri.path}';
+    return WooConstants.allowedUrls.any(hostAndPath.contains);
   }
 
   @override
