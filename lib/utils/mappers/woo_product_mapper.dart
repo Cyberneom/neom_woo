@@ -283,9 +283,16 @@ class WooProductMapper {
           releaseItem.type = ReleaseType.chapter;
         }
         releaseItem.name = download.name ?? '';
-        releaseItem.ownerName = product.name;
+        // The artist only, matching WooGatewayController: `product.name` is
+        // "<Artist> - <Album>", and using it whole produced a different
+        // ownerSlug for the same artist depending on the import path.
+        releaseItem.ownerName = TextUtilities.getArtistName(product.name);
         releaseItem.previewUrl = download.file ?? '';
         releaseItem.id = '${product.id}_${index++}';
+        // Address the release as /a/{ownerSlug}/{slug}; Woo imports carried no
+        // slug at all, which is why they fell back to the raw `2419_2` id.
+        releaseItem.ownerSlug = AppReleaseItem.generateOwnerSlug(releaseItem.ownerName);
+        releaseItem.slug = AppReleaseItem.generateSlug(releaseItem.name);
         return releaseItem;
       },).toList(),
     );

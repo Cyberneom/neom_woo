@@ -145,6 +145,9 @@ class WooGatewayController implements WooGatewayService {
           releaseItem.id = '${product.id}_${index++}';
           releaseItem.metaId = product.id.toString();
           releaseItem.metaName = TextUtilities.getMediaName(product.name);
+          // Address the release as /a/{ownerSlug}/{slug} instead of the raw id.
+          releaseItem.ownerSlug = AppReleaseItem.generateOwnerSlug(releaseItem.ownerName);
+          releaseItem.slug = AppReleaseItem.generateSlug(releaseItem.name);
           releases.add(releaseItem);
         },);
 
