@@ -6,29 +6,55 @@ import '../../domain/model/woo_product.dart';
 import '../../utils/enums/woo_product_status.dart';
 
 class WooFirebaseFunctions {
+  static const Duration _callableTimeout = Duration(seconds: 20);
 
-  static Future<List<WooProduct>> getProducts({int perPage = 25, int page = 1,
-    WooProductStatus status = WooProductStatus.publish, List<String> categoryIds = const []}) async {
-    AppConfig.logger.d('Fetching WooProducts from Firebase Functions: page $page, perPage $perPage, status ${status.name}, categoryIds $categoryIds');
+  static Future<List<WooProduct>> getProducts({
+    int perPage = 25,
+    int page = 1,
+    WooProductStatus status = WooProductStatus.publish,
+    List<String> categoryIds = const [],
+  }) async {
+    final safePage = page.clamp(1, 1000);
+    final safePerPage = perPage.clamp(1, 100);
+    final safeCategoryIds = categoryIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty && e.length <= 64)
+        .take(50)
+        .toList(growable: false);
+
+    AppConfig.logger.d(
+      'Fetching WooProducts from Firebase Functions: page $safePage, '
+      'perPage $safePerPage, status ${status.name}, '
+      'categoryIds ${safeCategoryIds.length}',
+    );
     List<WooProduct> products = [];
 
     try {
       final result = await FirebaseFunctions.instanceFor(region: 'us-central1')
           .httpsCallable('getWooProducts')
           .call({
-        'page': page,
-        'perPage': perPage,
-        'status': status.name,
-        'categoryIds': categoryIds,
-      });
+            'page': safePage,
+            'perPage': safePerPage,
+            'status': status.name,
+            'categoryIds': safeCategoryIds,
+          })
+          .timeout(_callableTimeout);
 
-      final List data = result.data;
-      products = data.map((e) => WooProduct.fromJSON(e)).toList();
-
+      final raw = result.data;
+      if (raw is List) {
+        products = raw
+            .whereType<Map>()
+            .map((e) => WooProduct.fromJSON(Map<String, dynamic>.from(e)))
+            .toList();
+      }
     } catch (e, st) {
-      NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'getProducts');
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_woo',
+        operation: 'getProducts',
+      );
     }
     return products;
   }
-
 }

@@ -80,9 +80,55 @@ class WooGatewayController implements WooGatewayService {
   }
 
   @override
-  Future<AppReleaseItem?> getProductAsReleaseItem(String productId, {fromFunctions = false}) {
-    // TODO: implement getProductAsReleaseItem
-    throw UnimplementedError();
+  Future<AppReleaseItem?> getProductAsReleaseItem(String productId, {fromFunctions = false}) async {
+    final trimmedId = productId.trim();
+    if (trimmedId.isEmpty) return null;
+
+    try {
+      final product = await WooProductsAPI.getProduct(trimmedId);
+      if (product == null) return null;
+
+      final releaseItem = WooProductMapper.toAppReleaseItem(product);
+      if (product.categories.firstWhereOrNull(
+            (category) => category.name.toLowerCase() == MediaItemType.podcast.name.toLowerCase(),
+          ) !=
+          null) {
+        releaseItem.type = ReleaseType.episode;
+      } else if (product.categories.firstWhereOrNull(
+            (category) => category.name.toLowerCase() == MediaItemType.audiobook.name.tr.toLowerCase(),
+          ) !=
+          null) {
+        releaseItem.type = ReleaseType.chapter;
+      }
+
+      final downloads = product.downloads;
+      if (downloads != null && downloads.isNotEmpty) {
+        final firstDownload = downloads.first;
+        if ((firstDownload.name ?? '').isNotEmpty) {
+          releaseItem.name = firstDownload.name!;
+        }
+        if ((firstDownload.file ?? '').isNotEmpty) {
+          releaseItem.previewUrl = firstDownload.file!;
+        }
+        releaseItem.ownerName = TextUtilities.getArtistName(product.name);
+        releaseItem.metaId = product.id.toString();
+        releaseItem.metaName = TextUtilities.getMediaName(product.name);
+        releaseItem.ownerSlug = AppReleaseItem.generateOwnerSlug(releaseItem.ownerName);
+        releaseItem.slug = AppReleaseItem.generateSlug(releaseItem.name);
+        AppConfig.instance.releaseItemlists[product.id.toString()] =
+            WooProductMapper.toItemlist(product);
+      }
+
+      return releaseItem;
+    } catch (e, st) {
+      NeomErrorLogger.recordError(
+        e,
+        st,
+        module: 'neom_woo',
+        operation: 'getProductAsReleaseItem',
+      );
+      return null;
+    }
   }
 
   @override
@@ -94,9 +140,17 @@ class WooGatewayController implements WooGatewayService {
 
     List<WooProduct> wooProducts = [];
     if(fromFunctions) {
-      wooProducts = await WooFirebaseFunctions.getProducts(perPage: perPage, categoryIds: categoryIds);
+      wooProducts = await WooFirebaseFunctions.getProducts(
+        perPage: perPage,
+        page: page,
+        categoryIds: categoryIds,
+      );
     } else {
-      wooProducts = await WooProductsAPI.getProducts(perPage: perPage, categoryIds: categoryIds);
+      wooProducts = await WooProductsAPI.getProducts(
+        perPage: perPage,
+        page: page,
+        categoryIds: categoryIds,
+      );
     }
 
     Map<ProductType, Map<int, AppReleaseItem>> categorizedReleaseItems = {
@@ -115,8 +169,9 @@ class WooGatewayController implements WooGatewayService {
 
     for (int i = 0; i < wooProducts.length; i++) {
       WooProduct product = wooProducts[i];
-      if(product.downloads?.isEmpty ?? true ) {
-        String type = product.attributes?[WooAttributeConstants.productType]?.options.first ?? '';
+      if (product.downloads?.isEmpty ?? true) {
+        final opts = product.attributes?[WooAttributeConstants.productType]?.options;
+        String type = (opts != null && opts.isNotEmpty) ? opts.first : '';
         productType = EnumToString.fromString(ProductType.values, type) ?? ProductType.digital;
 
         AppReleaseItem releaseItem = WooProductMapper.toAppReleaseItem(product);
@@ -151,8 +206,10 @@ class WooGatewayController implements WooGatewayService {
           releases.add(releaseItem);
         },);
 
-        int randomIndex = Random().nextInt(releases.length);
-        categorizedReleaseItems[productType]?[i] = releases[randomIndex];
+        if (releases.isNotEmpty) {
+          int randomIndex = Random().nextInt(releases.length);
+          categorizedReleaseItems[productType]?[i] = releases[randomIndex];
+        }
         AppConfig.instance.releaseItemlists[product.id.toString()] = WooProductMapper.toItemlist(product);
       }
 

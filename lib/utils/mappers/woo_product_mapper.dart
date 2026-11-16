@@ -20,38 +20,63 @@ import '../../domain/model/woo_product_tag.dart';
 import '../../utils/enums/woo_product_status.dart';
 
 class WooProductMapper {
+  static String? _firstAttrOption(WooProduct product, String key) {
+    final opts = product.attributes?[key]?.options;
+    if (opts == null || opts.isEmpty) return null;
+    return opts.first;
+  }
+
+  static bool _parseBoolOption(String? raw, {required bool fallback}) {
+    if (raw == null) return fallback;
+    final norm = raw.trim().toLowerCase();
+    if (norm == 'true' || norm == '1' || norm == 'yes') return true;
+    if (norm == 'false' || norm == '0' || norm == 'no') return false;
+    return fallback;
+  }
 
   static AppReleaseItem toAppReleaseItem(WooProduct product) {
+    final previewOpt = _firstAttrOption(product, 'previewUrl');
+    final durationOpt = _firstAttrOption(product, 'duration');
+    final typeOpt = _firstAttrOption(product, 'type');
+    final ownerEmailOpt = _firstAttrOption(product, 'ownerEmail');
+    final ownerNameOpt = _firstAttrOption(product, 'ownerName');
+    final languageOpt = _firstAttrOption(product, 'language');
+    final isRentalOpt = _firstAttrOption(product, 'isRental');
+    final publishedYearOpt = _firstAttrOption(product, 'publishedYear');
+    final metaOwnerOpt =
+        _firstAttrOption(product, 'metaOwner') ??
+        _firstAttrOption(product, 'publisher');
+    final webPreviewOpt = _firstAttrOption(product, 'webPreviewUrl');
+
     return AppReleaseItem(
         id: product.id.toString(),
         name: product.name,
         description: product.description.isNotEmpty ? product.description : product.shortDescription.isNotEmpty ? product.shortDescription : '',
         imgUrl: product.images.isNotEmpty ? product.images.first.src : '',
         galleryUrls: product.images.map<String>((img)=> img.src).toList(),
-        previewUrl: (product.attributes?.containsKey('previewUrl') ?? false) ? product.attributes!['previewUrl']!.options.first : '',
-        duration: (product.attributes?.containsKey('duration') ?? false) ? int.tryParse(product.attributes!['duration']!.options.first) ?? 0 : 0,
-        type: (product.attributes?.containsKey('type') ?? false) ? EnumToString.fromString(ReleaseType.values, product.attributes!['type']!.options.first) ?? ReleaseType.single : ReleaseType.single,
+        previewUrl: previewOpt ?? '',
+        duration: durationOpt != null ? (int.tryParse(durationOpt) ?? 0) : 0,
+        type: typeOpt != null ? (EnumToString.fromString(ReleaseType.values, typeOpt) ?? ReleaseType.single) : ReleaseType.single,
         status: EnumToString.fromString(ReleaseStatus.values, product.status.name) ?? ReleaseStatus.draft,
-        ownerEmail: (product.attributes?.containsKey('ownerEmail') ?? false) ? product.attributes!['ownerEmail']!.options.first : '',
-        ownerName: (product.attributes?.containsKey('ownerName') ?? false) ? product.attributes!['ownerName']!.options.first : TextUtilities.getArtistName(product.name),
+        ownerEmail: ownerEmailOpt ?? '',
+        ownerName: ownerNameOpt ?? TextUtilities.getArtistName(product.name),
         ownerType: OwnerType.woo,
         categories: List.from(product.categories.map((c) => c.name).toList()),
         tags: List.from(product.tags.map((t) => t.name).toList()),
         lyrics: product.shortDescription,
-        language: (product.attributes?.containsKey('language') ?? false) ? product.attributes!['language']!.options.first : '',
+        language: languageOpt ?? '',
         digitalPrice: product.virtual ? Price(amount: product.regularPrice, currency: AppCurrency.mxn) : null,
         physicalPrice: !product.virtual ? Price(amount: product.regularPrice, currency: AppCurrency.mxn) : null,
         salePrice: Price(amount: product.salePrice, currency: AppCurrency.mxn),
         variations: product.variations,
-        isRental: (product.attributes?.containsKey('isRental') ?? true) ? bool.parse(product.attributes!['isRental']!.options.first) : true,
-        publishedYear: (product.attributes?.containsKey('publishedYear') ?? false) ? int.tryParse(product.attributes!['publishedYear']!.options.first) : null,
-        metaOwner: (product.attributes?.containsKey('metaOwner') ?? false) ? product.attributes!['metaOwner']!.options.first
-            : (product.attributes?.containsKey('publisher') ?? false) ? product.attributes!['publisher']!.options.first : null, ///REMOVE LOOKUP FOR PUBLISHER WHEN WOOCOMMERCE IS UPDATED
+        isRental: _parseBoolOption(isRentalOpt, fallback: true),
+        publishedYear: publishedYearOpt != null ? int.tryParse(publishedYearOpt) : null,
+        metaOwner: metaOwnerOpt,
         createdTime: product.dateCreated?.millisecondsSinceEpoch ?? 0,
         modifiedTime: product.dateModified?.millisecondsSinceEpoch,
         state: 0,
         externalUrl: product.permalink,
-        webPreviewUrl: (product.attributes?.containsKey('webPreviewUrl') ?? false) ? product.attributes!['webPreviewUrl']!.options.first : null
+        webPreviewUrl: webPreviewOpt
     );
   }
 
@@ -62,13 +87,13 @@ class WooProductMapper {
     String? downloadFileUrl,
   }) {
     // Determine if product is virtual or physical based on prices
-    final bool hasPhysicalPrice = item.physicalPrice != null && (item.physicalPrice!.amount ?? 0) > 0;
-    final bool hasDigitalPrice = item.digitalPrice != null && (item.digitalPrice!.amount ?? 0) > 0;
+    final bool hasPhysicalPrice = item.physicalPrice != null && item.physicalPrice!.amount > 0;
+    final bool hasDigitalPrice = item.digitalPrice != null && item.digitalPrice!.amount > 0;
     final bool isVirtual = !hasPhysicalPrice;
 
     // Use physical price if available, otherwise digital price
     final double regularPrice = hasPhysicalPrice
-        ? (item.physicalPrice!.amount ?? 0.0)
+        ? item.physicalPrice!.amount
         : (item.digitalPrice?.amount ?? 0.0);
 
     // Generate SKU: author initials + title initials + D/F + short timestamp for uniqueness
@@ -196,19 +221,19 @@ class WooProductMapper {
         if (item.place != null)
           'place': WooProductAttribute(
             name: 'place',
-            options: [item.place!.name ?? ''],
+            options: [item.place!.name],
             visible: true,
           ),
         if (hasPhysicalPrice)
           'physicalPrice': WooProductAttribute(
             name: 'physicalPrice',
-            options: [(item.physicalPrice!.amount ?? 0).toString()],
+            options: [item.physicalPrice!.amount.toString()],
             visible: true,
           ),
         if (hasDigitalPrice)
           'digitalPrice': WooProductAttribute(
             name: 'digitalPrice',
-            options: [(item.digitalPrice!.amount ?? 0).toString()],
+            options: [item.digitalPrice!.amount.toString()],
             visible: true,
           ),
       },
@@ -234,15 +259,16 @@ class WooProductMapper {
   /// Format: AUTHOR_INITIALS-TITLE_INITIALS-TYPE-TIMESTAMP (e.g., SM-PDGC-D-1771217893)
   static String _generateSku(String authorName, String title, bool isPhysical, {int timestamp = 0}) {
     String getInitials(String text) {
-      if (text.isEmpty) return 'XX';
-      final words = text.trim().split(RegExp(r'\s+'));
+      final trimmed = text.trim();
+      if (trimmed.isEmpty) return 'XX';
+      final words = trimmed.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+      if (words.isEmpty) return 'XX';
       if (words.length == 1) {
-        return text.substring(0, text.length >= 3 ? 3 : text.length).toUpperCase();
+        final single = words.first;
+        return single.substring(0, single.length >= 3 ? 3 : single.length).toUpperCase();
       }
-      return words
-          .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
-          .join()
-          .substring(0, words.length >= 4 ? 4 : words.length);
+      final joined = words.map((w) => w[0].toUpperCase()).join();
+      return joined.substring(0, joined.length >= 4 ? 4 : joined.length);
     }
 
     final authorInitials = getInitials(authorName);
@@ -255,22 +281,27 @@ class WooProductMapper {
   }
 
   static Itemlist toItemlist(WooProduct product) {
+    final ownerEmailOpt = _firstAttrOption(product, 'ownerEmail');
+    final ownerNameOpt = _firstAttrOption(product, 'ownerName');
+    final typeOpt = _firstAttrOption(product, 'type');
+    final languageOpt = _firstAttrOption(product, 'language');
+
     return Itemlist(
       id: product.id.toString(),
       name: product.name,
       description: product.description.isNotEmpty ? product.description : product.shortDescription.isNotEmpty ? product.shortDescription : '',
-      ownerId: (product.attributes?.containsKey('ownerEmail') ?? false) ? product.attributes!['ownerEmail']!.options.first : '',
-      ownerName: (product.attributes?.containsKey('ownerName') ?? false) ? product.attributes!['ownerName']!.options.first : '',
+      ownerId: ownerEmailOpt ?? '',
+      ownerName: ownerNameOpt ?? '',
       ownerType: OwnerType.woo,
       href: product.permalink,
       imgUrl: product.images.isNotEmpty ? product.images.first.src : '',
       public: (EnumToString.fromString(ReleaseStatus.values, product.status.name) ?? ReleaseStatus.draft) == ReleaseStatus.publish,
       isModifiable: false,
       uri: product.permalink,
-      type: (product.attributes?.containsKey('type') ?? false) ? EnumToString.fromString(ItemlistType.values, product.attributes!['type']!.options.first) ?? ItemlistType.single : ItemlistType.single,
+      type: typeOpt != null ? (EnumToString.fromString(ItemlistType.values, typeOpt) ?? ItemlistType.single) : ItemlistType.single,
       categories: List.from(product.categories.map((c) => c.name).toList()),
       tags: List.from(product.tags.map((t) => t.name).toList()),
-      language: (product.attributes?.containsKey('language') ?? false) ? product.attributes!['language']!.options.first : '',
+      language: languageOpt ?? '',
       createdTime: product.dateCreated?.millisecondsSinceEpoch ?? 0,
       modifiedTime: product.dateModified?.millisecondsSinceEpoch,
       appReleaseItems: product.downloads?.asMap().entries.map((entry) {

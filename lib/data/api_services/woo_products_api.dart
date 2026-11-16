@@ -4,20 +4,23 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/cloud_properties.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 
 import '../../domain/model/woo_product.dart';
 import '../../domain/model/woo_product_attribute.dart';
 import '../../utils/constants/woo_attribute_constants.dart';
 import '../../utils/constants/woo_constants.dart';
 import '../../utils/enums/woo_product_status.dart';
+import '../../utils/woo_security_utils.dart';
 
 /// WooCommerce Products API.
 /// In secure mode (web), routes through Cloud Functions wooProxy.
 /// On mobile, calls WooCommerce directly with credentials.
 class WooProductsAPI {
+  static const Duration _httpTimeout = Duration(seconds: 20);
+  static const int maxResponseBytes = 5 * 1024 * 1024;
 
   /// Central helper for WooCommerce API calls.
   /// In secure mode: proxies through Cloud Functions.
@@ -27,13 +30,25 @@ class WooProductsAPI {
     String method = 'GET',
     Map<String, dynamic>? body,
   }) async {
+    if (!WooSecurityUtils.isSafeApiPath(path)) {
+      throw StateError('WooProductsAPI: unsafe API path');
+    }
     if (CloudProperties.isSecureMode || kIsWeb) {
       // Web: ALWAYS proxy — WooCommerce credentials are server-side only.
       return CloudProperties.wooProxy(path: path, method: method, body: body);
     }
 
+    final baseUrl = AppProperties.getWooUrl().trim();
+    if (baseUrl.isEmpty) {
+      throw StateError('WooProductsAPI: empty Woo base URL');
+    }
+    final fullUrl = '$baseUrl$path';
+    if (!WooSecurityUtils.isSafePublicHttpsUrl(fullUrl)) {
+      throw StateError('WooProductsAPI: invalid or non-public HTTPS Woo URL');
+    }
+    final uri = Uri.parse(fullUrl);
+
     // Mobile only: direct call
-    final url = '${AppProperties.getWooUrl()}$path';
     final credentials = base64Encode(
       utf8.encode('${CloudProperties.getWooClientKey()}:${CloudProperties.getWooClientSecret()}'),
     );
@@ -44,38 +59,74 @@ class WooProductsAPI {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     };
 
-    late http.Response response;
-    switch (method.toUpperCase()) {
-      case 'POST':
-        response = await http.post(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
-        break;
-      case 'PUT':
-        response = await http.put(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
-        break;
-      default:
-        response = await http.get(Uri.parse(url), headers: headers);
+    final upperMethod = switch (method.toUpperCase()) {
+      'POST' => 'POST',
+      'PUT' => 'PUT',
+      _ => 'GET',
+    };
+    final encodedBody =
+        ((upperMethod == 'POST' || upperMethod == 'PUT') && body != null)
+            ? jsonEncode(body)
+            : null;
+    final client = http.Client();
+    late final int statusCode;
+    late final Map<String, String> responseHeaders;
+    late final List<int> bodyBytes;
+    try {
+      final request = http.Request(upperMethod, uri)
+        ..followRedirects = false
+        ..headers.addAll(headers);
+      if (encodedBody != null) {
+        request.body = encodedBody;
+      }
+      final streamed = await client.send(request).timeout(_httpTimeout);
+      statusCode = streamed.statusCode;
+      responseHeaders = streamed.headers;
+      if (streamed.contentLength != null &&
+          streamed.contentLength! > maxResponseBytes) {
+        throw Exception('Respuesta WooCommerce excede límite de $maxResponseBytes bytes');
+      }
+      final chunks = <int>[];
+      await for (final chunk in streamed.stream.timeout(_httpTimeout)) {
+        chunks.addAll(chunk);
+        if (chunks.length > maxResponseBytes) {
+          throw Exception('Respuesta WooCommerce excede límite de $maxResponseBytes bytes');
+        }
+      }
+      bodyBytes = chunks;
+    } finally {
+      client.close();
     }
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(response.body);
+    final decodedBody = utf8.decode(bodyBytes, allowMalformed: true);
+    if (statusCode >= 200 && statusCode < 300) {
+      return jsonDecode(decodedBody);
     }
 
-    final contentType = response.headers['content-type'] ?? '';
-    if (!contentType.contains('application/json') || response.body.trim().startsWith('<')) {
-      AppConfig.logger.e('Woo response invalid (${response.statusCode})');
+    final contentType = responseHeaders['content-type'] ?? '';
+    if (!contentType.contains('application/json') || decodedBody.trim().startsWith('<')) {
+      AppConfig.logger.e('Woo response invalid ($statusCode)');
       throw Exception('Respuesta bloqueada por seguridad del servidor');
     }
 
-    AppConfig.logger.e('Woo error (${response.statusCode}): ${response.body}');
-    throw Exception('Error WooCommerce: ${response.statusCode}');
+    AppConfig.logger.e(
+      'Woo error ($statusCode, ${bodyBytes.length} bytes)',
+    );
+    throw Exception('Error WooCommerce: $statusCode');
   }
 
   static Future<List<WooProduct>> getProducts({int perPage = 25, int page = 1,
     WooProductStatus status = WooProductStatus.publish, List<String> categoryIds = const []}) async {
 
-    String path = '/products?page=$page&per_page=$perPage&status=${status.name}';
-    if (categoryIds.isNotEmpty) {
-      path = '$path&category=${categoryIds.join(',')}';
+    final safePage = page < 1 ? 1 : page;
+    final safePerPage = perPage.clamp(1, 100);
+    String path = '/products?page=$safePage&per_page=$safePerPage&status=${Uri.encodeComponent(status.name)}';
+    final cleanCategories = categoryIds
+        .map((c) => c.trim())
+        .where((c) => RegExp(r'^\d+$').hasMatch(c))
+        .toList();
+    if (cleanCategories.isNotEmpty) {
+      path = '$path&category=${cleanCategories.join(',')}';
     }
 
     List<WooProduct> products = [];
@@ -113,14 +164,17 @@ class WooProductsAPI {
   }
 
   static Future<void> addAttributesToProduct(String productId, List<WooProductAttribute> attributes, {bool isNew = false}) async {
+    final trimmedId = productId.trim();
+    if (trimmedId.isEmpty) return;
     int position = 0;
     try {
+      final remaining = List<WooProductAttribute>.from(attributes);
       List<WooProductAttribute> totalAttributes = [];
-      if(!isNew) {
-        WooProduct? currentProduct = await getProduct(productId);
-        if(currentProduct?.attributes?.isNotEmpty ?? false) {
-          for(var attribute in attributes) {
-            if(currentProduct!.attributes!.containsKey(attribute.name)) {
+      if (!isNew) {
+        WooProduct? currentProduct = await getProduct(trimmedId);
+        if (currentProduct?.attributes?.isNotEmpty ?? false) {
+          for (var attribute in remaining) {
+            if (currentProduct!.attributes!.containsKey(attribute.name)) {
               currentProduct.attributes![attribute.name] = attribute;
               attribute.position = position;
               totalAttributes.add(attribute);
@@ -128,23 +182,22 @@ class WooProductsAPI {
             }
           }
           totalAttributes.addAll(currentProduct!.attributes!.values);
-          for(var attribute in totalAttributes) {
-            attributes.removeWhere((atr) => atr.name == attribute.name);
+          for (var attribute in totalAttributes) {
+            remaining.removeWhere((atr) => atr.name == attribute.name);
           }
 
           position = currentProduct.attributes?.length ?? 0;
         }
-
       }
 
-      for(var attribute in attributes) {
+      for (var attribute in remaining) {
         attribute.position = position;
         totalAttributes.add(attribute);
         position++;
       }
 
       final data = await _callWoo(
-        path: '/products/$productId',
+        path: '/products/${Uri.encodeComponent(trimmedId)}',
         method: 'PUT',
         body: {
           WooConstants.attributes: totalAttributes.map((attribute) => attribute.toJSON()).toList(),
@@ -162,9 +215,11 @@ class WooProductsAPI {
   }
 
   static Future<WooProduct?> getProduct(String productId) async {
+    final trimmedId = productId.trim();
+    if (trimmedId.isEmpty) return null;
     WooProduct? product;
     try {
-      final data = await _callWoo(path: '/products/$productId');
+      final data = await _callWoo(path: '/products/${Uri.encodeComponent(trimmedId)}');
 
       if (data != null) {
         product = WooProduct.fromJSON(data);
@@ -177,11 +232,14 @@ class WooProductsAPI {
   }
 
   static Future<List<WooProduct>> getVariations(int productId, {int perPage = 100, int page = 1, String searchParam = ''}) async {
+    if (productId <= 0) return [];
     List<WooProduct> productVariations = [];
+    final safePage = page < 1 ? 1 : page;
+    final safePerPage = perPage.clamp(1, 100);
 
     try {
       final data = await _callWoo(
-        path: '/products/$productId/variations?page=$page&per_page=$perPage&search=${Uri.encodeComponent(searchParam)}',
+        path: '/products/$productId/variations?page=$safePage&per_page=$safePerPage&search=${Uri.encodeComponent(searchParam)}',
       );
 
       if (data is List) {
@@ -196,9 +254,13 @@ class WooProductsAPI {
 
   // Crear una nueva variación si no existe
   static Future<String> createVariation(String productId, String attributeName, String optionValue, {String sku = ''}) async {
+    final trimmedId = productId.trim();
+    if (trimmedId.isEmpty || attributeName.trim().isEmpty || optionValue.trim().isEmpty) {
+      return '';
+    }
     try {
       final data = await _callWoo(
-        path: '/products/$productId/variations',
+        path: '/products/${Uri.encodeComponent(trimmedId)}/variations',
         method: 'POST',
         body: {
           'attributes': [
@@ -207,13 +269,13 @@ class WooProductsAPI {
               'option': optionValue,
             },
           ],
-          'sku': Uri.encodeComponent('$productId-${optionValue.toUpperCase()}'),
+          'sku': Uri.encodeComponent('$trimmedId-${optionValue.toUpperCase()}'),
           'virtual': true,
           'regular_price': '0.00',
         },
       );
 
-      if (data != null) {
+      if (data is Map && data['id'] != null) {
         AppConfig.logger.i('Variation was created');
         return data['id'].toString();
       }
@@ -224,24 +286,16 @@ class WooProductsAPI {
   }
 
   static Future<String> getNupaleVariationId(String itemName) async {
-
     WooProduct? nupaleProduct = await getProduct(AppProperties.getWooNupaleProdutId());
-    List<WooProduct> variations = await getVariations(nupaleProduct!.id, searchParam: itemName.toLowerCase());
+    if (nupaleProduct == null || nupaleProduct.id <= 0) return '';
+    List<WooProduct> variations = await getVariations(nupaleProduct.id, searchParam: itemName.toLowerCase());
     String variationId = '';
 
-    if(variations.isNotEmpty) {
-      if(variations.length == 1) {
-        AppConfig.logger.d('A Single Product Variation was retrieved.');
-      } else {
-        AppConfig.logger.d('${variations.length} Product Variations were retrieved.');
-      }
+    if (variations.isNotEmpty) {
       variationId = variations.first.id.toString();
-    } else {
-      AppConfig.logger.d('Product Variations are empty');
     }
 
     if (variationId.isEmpty) {
-      AppConfig.logger.d('VariationId is empty');
       variationId = await createNupaleVariation(nupaleProduct, itemName);
     }
 
@@ -249,9 +303,8 @@ class WooProductsAPI {
   }
 
   static Future<String> createNupaleVariation(WooProduct nupaleProduct, String itemName) async {
-    /// Variación no existe, crear variación y luego orden
     WooProductAttribute? currentAttribute = nupaleProduct.attributes?[WooAttributeConstants.itemName];
-    if(currentAttribute != null) {
+    if (currentAttribute != null) {
       currentAttribute.options.add(itemName);
       currentAttribute.variation = true;
     } else {
@@ -262,31 +315,24 @@ class WooProductsAPI {
       );
     }
     await WooProductsAPI.addAttributesToProduct(nupaleProduct.id.toString(), [currentAttribute]);
-    String variationId = '';
-    variationId = await WooProductsAPI.createVariation(nupaleProduct.id.toString(), WooAttributeConstants.itemName, itemName);
-
-    return variationId;
+    return WooProductsAPI.createVariation(
+      nupaleProduct.id.toString(),
+      WooAttributeConstants.itemName,
+      itemName,
+    );
   }
 
   static Future<String> getCaseteVariationId(String itemName) async {
-
     WooProduct? caseteProduct = await getProduct(AppProperties.getWooCaseteProdutId());
-    List<WooProduct> variations = await getVariations(caseteProduct!.id, searchParam: itemName.toLowerCase());
+    if (caseteProduct == null || caseteProduct.id <= 0) return '';
+    List<WooProduct> variations = await getVariations(caseteProduct.id, searchParam: itemName.toLowerCase());
     String variationId = '';
 
-    if(variations.isNotEmpty) {
-      if(variations.length == 1) {
-        AppConfig.logger.d('A Single Product Variation was retrieved.');
-      } else {
-        AppConfig.logger.d('${variations.length} Product Variations were retrieved.');
-      }
+    if (variations.isNotEmpty) {
       variationId = variations.first.id.toString();
-    } else {
-      AppConfig.logger.d('Product Variations are empty');
     }
 
     if (variationId.isEmpty) {
-      AppConfig.logger.d('VariationId is empty');
       variationId = await createCaseteVariation(caseteProduct, itemName);
     }
 
@@ -295,11 +341,15 @@ class WooProductsAPI {
 
   /// Fetches all product categories from WooCommerce
   static Future<List<Map<String, dynamic>>> getCategories({int perPage = 100}) async {
+    final safePerPage = perPage.clamp(1, 100);
     try {
-      final data = await _callWoo(path: '/products/categories?per_page=$perPage');
+      final data = await _callWoo(path: '/products/categories?per_page=$safePerPage');
 
       if (data is List) {
-        return data.cast<Map<String, dynamic>>();
+        return data
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
       }
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'getCategories');
@@ -317,9 +367,9 @@ class WooProductsAPI {
         body: {'name': name, 'slug': slug},
       );
 
-      if (data != null) {
+      if (data is Map) {
         AppConfig.logger.i('Category "$name" created successfully');
-        return data as Map<String, dynamic>;
+        return Map<String, dynamic>.from(data);
       }
     } catch (e, st) {
       // Check if category already exists
@@ -342,7 +392,8 @@ class WooProductsAPI {
     final existingCategories = await getCategories();
     final Map<String, int> slugToId = {};
     for (final cat in existingCategories) {
-      slugToId[(cat['slug'] as String? ?? '').toLowerCase()] = cat['id'] as int? ?? 0;
+      slugToId[(cat['slug'] as String? ?? '').toLowerCase()] =
+          (cat['id'] as num?)?.toInt() ?? 0;
     }
 
     final List<Map<String, dynamic>> resolvedCategories = [];

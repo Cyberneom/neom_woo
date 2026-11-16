@@ -12,6 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  sint: ^2.0.2
+
   neom_core:
     git:
       url: git@github.com:Open-Neom/neom_core.git
@@ -25,6 +27,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
+
+
 
 flutter:

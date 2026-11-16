@@ -1,60 +1,14 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/domain/model/app_user.dart';
 
-//TODO Working on it
 class WooUsersAPI {
-
+  /// Disabled client-side stub: never transmit user passwords or placeholder
+  /// credentials (`tudominio.com` / `<tu_clave_api>`) from the client.
+  /// Customer provisioning must go through a server-side Cloud Function.
   Future<void> createWooCommerceUser(AppUser user) async {
-    final url = Uri.parse('https://tudominio.com/wp-json/wc/v3/customers');
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Basic <tu_clave_api>',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    };
-    final body = jsonEncode({
-      'username': user.email,
-      'email': user.email,
-      'password': user.password,
-      // ... otros campos personalizados
-    });
-
-    final response = await http.post(url, headers: headers, body: body);
-    if (response.statusCode == 201) {
-      AppConfig.logger.i('Usuario creado exitosamente en WooCommerce');
-    } else {
-      AppConfig.logger.e('Error al crear usuario: ${response.body}');
-    }
+    AppConfig.logger.w(
+      'WooUsersAPI.createWooCommerceUser blocked on client; '
+      'use server-side CloudProperties.wooProxy instead.',
+    );
   }
-
-  // Future<void> createWordpressAccount(String nombre, String email, String password) async {
-  //   final url = 'https://tu-sitio.com/wp-json/wc/v3/customers';
-  //   final apiKey = 'tu_consumer_key';
-  //   final apiSecret = 'tu_consumer_secret';
-  //
-  //   final response = await http.post(
-  //     Uri.parse(url),
-  //     headers: {
-  //       'Authorization': 'Basic ' + base64Encode(utf8.encode('$apiKey:$apiSecret')),
-  //       'Content-Type': 'application/json',
-  //     },
-  //     body: jsonEncode({
-  //       'email': email,
-  //       'first_name': nombre,
-  //       'password': password,
-  //       'username': email.split('@').first,
-  //     }),
-  //   );
-  //
-  //   if (response.statusCode == 201) {
-  //     // Cuenta creada con éxito en WooCommerce
-  //     print('Cuenta creada: ${response.body}');
-  //   } else {
-  //     // Manejo de errores
-  //     print('Error: ${response.body}');
-  //   }
-  // }
-
 }

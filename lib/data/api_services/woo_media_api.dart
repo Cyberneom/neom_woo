@@ -2,106 +2,153 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:neom_core/utils/platform/core_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/domain/use_cases/woo_media_service.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
+import 'package:neom_core/utils/platform/core_io.dart';
 
 import '../../utils/constants/woo_constants.dart';
+import '../../utils/woo_security_utils.dart';
 
 class WooMediaAPI implements WooMediaService {
+  /// Maximum allowed upload size for WordPress media (`25 MiB`).
+  static const int maxUploadBytes = 25 * 1024 * 1024;
 
-  /// Sanitizes a filename for use in HTTP headers by removing non-ASCII characters
-  /// and replacing accented characters with their ASCII equivalents.
-  String _sanitizeFilename(String filename) {
-    // Map of accented characters to their ASCII equivalents
-    const Map<String, String> accentMap = {
-      'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a',
-      'Á': 'A', 'À': 'A', 'Ä': 'A', 'Â': 'A', 'Ã': 'A', 'Å': 'A',
-      'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e',
-      'É': 'E', 'È': 'E', 'Ë': 'E', 'Ê': 'E',
-      'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
-      'Í': 'I', 'Ì': 'I', 'Ï': 'I', 'Î': 'I',
-      'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o', 'ø': 'o',
-      'Ó': 'O', 'Ò': 'O', 'Ö': 'O', 'Ô': 'O', 'Õ': 'O', 'Ø': 'O',
-      'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u',
-      'Ú': 'U', 'Ù': 'U', 'Ü': 'U', 'Û': 'U',
-      'ñ': 'n', 'Ñ': 'N',
-      'ç': 'c', 'Ç': 'C',
-    };
+  /// Maximum allowed JSON response size for WordPress media upload (`2 MiB`).
+  static const int maxJsonResponseBytes = 2 * 1024 * 1024;
 
-    String sanitized = filename;
-    accentMap.forEach((accented, replacement) {
-      sanitized = sanitized.replaceAll(accented, replacement);
-    });
+  /// Maximum allowed JWT token response size (`512 KiB`).
+  static const int maxJwtResponseBytes = 512 * 1024;
 
-    // Remove any remaining non-ASCII characters
-    sanitized = sanitized.replaceAll(RegExp(r'[^\x00-\x7F]'), '');
+  static final RegExp _unsafeUrlControls = WooSecurityUtils.unsafeUrlControlChars;
+  static final RegExp _unsafeHeaderChars = RegExp(r'[\r\n\x00]');
 
-    // Replace spaces with underscores for safety
-    sanitized = sanitized.replaceAll(' ', '_');
-
-    return sanitized;
+  static Future<String?> _readBoundedUtf8(
+    Stream<List<int>> stream,
+    int maxBytes,
+  ) async {
+    final chunks = <int>[];
+    await for (final chunk in stream.timeout(const Duration(seconds: 15))) {
+      chunks.addAll(chunk);
+      if (chunks.length > maxBytes) {
+        return null;
+      }
+    }
+    return utf8.decode(chunks, allowMalformed: true);
   }
+
+  /// Sanitizes a filename for safe use in HTTP `Content-Disposition` headers and
+  /// multipart uploads, stripping path traversal (`..`, `/`, `\`), Bidi/control
+  /// characters, quotes, and leading dots.
+  static String sanitizeMediaFilename(
+    String filename, {
+    String fallbackExtension = '',
+  }) =>
+      WooSecurityUtils.sanitizeMediaFilename(
+        filename,
+        fallbackExtension: fallbackExtension,
+      );
 
   @override
   Future<String> uploadMediaToWordPress(File file, {String fileName = ''}) async {
-    AppConfig.logger.i("Uploading media file to WordPress");
+    if (CloudProperties.isSecureMode || kIsWeb) {
+      AppConfig.logger.w('uploadMediaToWordPress skipped in secure mode — use wooMediaProxy');
+      return '';
+    }
+    final siteUrl = AppProperties.getSiteUrl().trim();
+    if (siteUrl.isEmpty || _unsafeUrlControls.hasMatch(siteUrl)) return '';
+    final targetUrl = '$siteUrl/wp-json/wp/v2/media';
+    if (!WooSecurityUtils.isSafePublicHttpsUrl(targetUrl)) {
+      return '';
+    }
+    final uri = Uri.parse(targetUrl);
 
-    String url = '${AppProperties.getSiteUrl()}/wp-json/wp/v2/media';
+    AppConfig.logger.i("Uploading media file to WordPress");
     String mediaUrl = '';
 
     try {
-      // Get the original file extension from the actual file path
-      String originalFilePath = file.path.split('/').last;
+      // Block UNC paths, symlinks, missing files, empty files, and oversized payloads before reading.
+      final rawFilePath = file.path.trim();
+      if (rawFilePath.isEmpty ||
+          rawFilePath.startsWith('//') ||
+          rawFilePath.startsWith(r'\\') ||
+          _unsafeUrlControls.hasMatch(rawFilePath)) {
+        AppConfig.logger.w('uploadMediaToWordPress rejected unsafe file path');
+        return '';
+      }
+      final entityType =
+          FileSystemEntity.typeSync(file.path, followLinks: false);
+      final parentType =
+          FileSystemEntity.typeSync(file.parent.path, followLinks: false);
+      if (entityType != FileSystemEntityType.file ||
+          parentType == FileSystemEntityType.link) {
+        AppConfig.logger.w('uploadMediaToWordPress rejected non-regular or symlinked file');
+        return '';
+      }
+      final fileBytes = file.lengthSync();
+      if (fileBytes <= 0 || fileBytes > maxUploadBytes) {
+        AppConfig.logger.w(
+          'uploadMediaToWordPress rejected invalid file size ($fileBytes bytes)',
+        );
+        return '';
+      }
+
+      String jwtToken = await getJwtToken();
+      if (jwtToken.isEmpty) return '';
+
+      String originalFilePath = file.path.replaceAll('\\', '/').split('/').last;
       String fileExtension = '';
       if (originalFilePath.contains('.')) {
         fileExtension = '.${originalFilePath.split('.').last}';
       }
 
-      // Sanitize filename for HTTP headers (remove accents and special characters)
       String rawFilename = fileName.isNotEmpty ? fileName : originalFilePath;
-      String sanitizedFilename = _sanitizeFilename(rawFilename);
+      String sanitizedFilename = sanitizeMediaFilename(
+        rawFilename,
+        fallbackExtension: fileExtension,
+      );
 
-      // Ensure the sanitized filename has the correct extension
-      if (fileExtension.isNotEmpty && !sanitizedFilename.toLowerCase().endsWith(fileExtension.toLowerCase())) {
-        sanitizedFilename = '$sanitizedFilename$fileExtension';
-      }
+      AppConfig.logger.d("Sanitized filename: $sanitizedFilename");
 
-      AppConfig.logger.d("Sanitized filename: $rawFilename -> $sanitizedFilename");
-
-      // Crea una solicitud de subida multipart
-      var request = http.MultipartRequest('POST', Uri.parse(url));
-
-      // Añadir el archivo al cuerpo de la solicitud
+      var request = http.MultipartRequest('POST', uri)
+        ..followRedirects = false;
       request.files.add(http.MultipartFile(
         'file',
-        file.readAsBytes().asStream(),
-        file.lengthSync(),
+        file.openRead(),
+        fileBytes,
         filename: sanitizedFilename,
       ));
 
-      // Añade las cabeceras necesarias
-      String jwtToken = await getJwtToken();
       request.headers['Authorization'] = 'Bearer $jwtToken';
       request.headers['Content-Disposition'] = 'attachment; filename="$sanitizedFilename"';
-      request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+      request.headers['User-Agent'] =
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-      // Envía la solicitud
-      var response = await request.send();
+      var response = await request.send().timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 201) {
-        // Obtiene la respuesta y decodifica
-        var responseData = await response.stream.bytesToString();
-        var jsonData = jsonDecode(responseData);
-        mediaUrl = jsonData['source_url'];
-        AppConfig.logger.i('Media uploaded successfully: $mediaUrl');
+        final responseData =
+            await _readBoundedUtf8(response.stream, maxJsonResponseBytes);
+        if (responseData == null) {
+          AppConfig.logger.w(
+            'uploadMediaToWordPress rejected oversized media response',
+          );
+          return '';
+        }
+        final jsonData = jsonDecode(responseData);
+        if (jsonData is Map && jsonData['source_url'] != null) {
+          final candidateUrl = jsonData['source_url'].toString().trim();
+          if (WooSecurityUtils.isSafePublicHttpsUrl(candidateUrl)) {
+            mediaUrl = candidateUrl;
+            AppConfig.logger.i('Media uploaded successfully: $mediaUrl');
+          }
+        }
       } else {
-        AppConfig.logger.e('Failed to upload media: ${response.statusCode}');
-        AppConfig.logger.e('Response: ${await response.stream.bytesToString()}');
+        await response.stream.drain<void>().catchError((_) {});
+        AppConfig.logger.e('Failed to upload media: HTTP ${response.statusCode}');
       }
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_woo', operation: 'uploadMediaToWordPress');
@@ -112,32 +159,69 @@ class WooMediaAPI implements WooMediaService {
 
   @override
   Future<String> getJwtToken() async {
-    // On web, WordPress credentials are server-side only.
-    // Media uploads use wooMediaProxy via Cloud Functions instead.
     if (CloudProperties.isSecureMode || kIsWeb) {
       AppConfig.logger.w('getJwtToken skipped in secure mode — use wooMediaProxy');
       return '';
     }
 
-    String url = '${AppProperties.getSiteUrl()}${WooConstants.jwtTokenUrl}';
+    final siteUrl = AppProperties.getSiteUrl().trim();
+    if (siteUrl.isEmpty) return '';
+    final jwtEndpoint = '$siteUrl${WooConstants.jwtTokenUrl}';
+    if (!WooSecurityUtils.isSafePublicHttpsUrl(jwtEndpoint)) {
+      throw StateError('Invalid WordPress JWT endpoint');
+    }
+    final uri = Uri.parse(jwtEndpoint);
 
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      },
-      body: jsonEncode({
-        WooConstants.username: CloudProperties.getWooAccount(),
-        WooConstants.password: CloudProperties.getWooPass(),
-      }),
-    );
+    final client = http.Client();
+    late final int statusCode;
+    late final String? rawBody;
+    try {
+      final request = http.Request('POST', uri)
+        ..followRedirects = false
+        ..headers.addAll({
+          'Content-Type': 'application/json',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        })
+        ..body = jsonEncode({
+          WooConstants.username: CloudProperties.getWooAccount(),
+          WooConstants.password: CloudProperties.getWooPass(),
+        });
+      final streamed =
+          await client.send(request).timeout(const Duration(seconds: 15));
+      statusCode = streamed.statusCode;
+      if (statusCode == 200) {
+        if (streamed.contentLength != null &&
+            streamed.contentLength! > maxJwtResponseBytes) {
+          await streamed.stream.drain<void>().catchError((_) {});
+          throw StateError('WordPress JWT response exceeded size limit');
+        }
+        rawBody = await _readBoundedUtf8(streamed.stream, maxJwtResponseBytes);
+      } else {
+        await streamed.stream.drain<void>().catchError((_) {});
+        rawBody = null;
+      }
+    } finally {
+      client.close();
+    }
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(response.body);
-      return responseData['token'];  // Retorna el token JWT
+    if (statusCode == 200) {
+      if (rawBody == null) {
+        throw StateError('WordPress JWT response exceeded size limit');
+      }
+      final responseData = jsonDecode(rawBody);
+      if (responseData is Map && responseData['token'] is String) {
+        final sanitizedToken = (responseData['token'] as String)
+            .replaceAll(_unsafeHeaderChars, '')
+            .trim();
+        if (sanitizedToken.isEmpty) {
+          throw StateError('Empty JWT token in WordPress response');
+        }
+        return sanitizedToken;
+      }
+      throw StateError('Missing JWT token in WordPress response');
     } else {
-      throw Exception('Failed to obtain JWT token. Status Code ${response.statusCode}');
+      throw Exception('Failed to obtain JWT token. Status Code $statusCode');
     }
   }
 

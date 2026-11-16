@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/app_properties.dart';
 import 'package:neom_core/cloud_properties.dart';
 import 'package:neom_core/domain/model/app_user.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 
 import '../../domain/model/order/woo_billing.dart';
 import '../../domain/model/order/woo_order.dart';
@@ -15,12 +15,15 @@ import '../../domain/model/order/woo_order_line_item.dart';
 import '../../domain/model/order/woo_shipping.dart';
 import '../../utils/enums/woo_order_status.dart';
 import '../../utils/enums/woo_payment_method.dart';
+import '../../utils/woo_security_utils.dart';
 import 'woo_products_api.dart';
 
 /// WooCommerce Orders API.
 /// In secure mode (web), routes through Cloud Functions wooProxy.
 /// On mobile, calls WooCommerce directly with credentials.
 class WooOrdersAPI {
+  static const Duration _httpTimeout = Duration(seconds: 20);
+  static const int maxResponseBytes = 5 * 1024 * 1024;
 
   /// Central helper for WooCommerce order calls.
   static Future<dynamic> _callWoo({
@@ -28,13 +31,29 @@ class WooOrdersAPI {
     String method = 'GET',
     Map<String, dynamic>? body,
   }) async {
+    if (!WooSecurityUtils.isSafeApiPath(path)) {
+      AppConfig.logger.w('WooOrdersAPI: rejected unsafe API path "$path"');
+      return null;
+    }
     if (CloudProperties.isSecureMode || kIsWeb) {
       // Web: ALWAYS proxy — WooCommerce credentials are server-side only.
       return CloudProperties.wooProxy(path: path, method: method, body: body);
     }
 
+    final baseUrl = AppProperties.getWooUrl().trim();
+    if (baseUrl.isEmpty) {
+      AppConfig.logger.w('WooOrdersAPI: empty Woo base URL');
+      return null;
+    }
+
+    final fullUrl = '$baseUrl$path';
+    if (!WooSecurityUtils.isSafePublicHttpsUrl(fullUrl)) {
+      AppConfig.logger.w('WooOrdersAPI: rejected non-public or non-HTTPS Woo URL');
+      return null;
+    }
+
     // Mobile only: direct call
-    final url = '${AppProperties.getWooUrl()}$path';
+    final uri = Uri.parse(fullUrl);
     final credentials = base64Encode(
       utf8.encode('${CloudProperties.getWooClientKey()}:${CloudProperties.getWooClientSecret()}'),
     );
@@ -44,25 +63,55 @@ class WooOrdersAPI {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     };
 
-    late http.Response response;
-    switch (method.toUpperCase()) {
-      case 'POST':
-        response = await http.post(Uri.parse(url), headers: headers, body: body != null ? jsonEncode(body) : null);
-        break;
-      default:
-        response = await http.get(Uri.parse(url), headers: headers);
+    final upperMethod = method.toUpperCase();
+    final encodedBody =
+        (upperMethod == 'POST' && body != null) ? jsonEncode(body) : null;
+    final client = http.Client();
+    late final int statusCode;
+    late final List<int> bodyBytes;
+    try {
+      final request = http.Request(
+        upperMethod == 'POST' ? 'POST' : 'GET',
+        uri,
+      )
+        ..followRedirects = false
+        ..headers.addAll(headers);
+      if (encodedBody != null) {
+        request.body = encodedBody;
+      }
+      final streamed = await client.send(request).timeout(_httpTimeout);
+      statusCode = streamed.statusCode;
+      if (streamed.contentLength != null &&
+          streamed.contentLength! > maxResponseBytes) {
+        AppConfig.logger.e('Woo order response exceeded $maxResponseBytes bytes');
+        return null;
+      }
+      final chunks = <int>[];
+      await for (final chunk in streamed.stream.timeout(_httpTimeout)) {
+        chunks.addAll(chunk);
+        if (chunks.length > maxResponseBytes) {
+          AppConfig.logger.e('Woo order response exceeded $maxResponseBytes bytes');
+          return null;
+        }
+      }
+      bodyBytes = chunks;
+    } finally {
+      client.close();
     }
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(response.body);
+    if (statusCode >= 200 && statusCode < 300) {
+      return jsonDecode(utf8.decode(bodyBytes, allowMalformed: true));
     }
 
-    AppConfig.logger.e('Woo order error (${response.statusCode}): ${response.body}');
+    AppConfig.logger.e(
+      'Woo order error ($statusCode, ${bodyBytes.length} bytes)',
+    );
     return null;
   }
 
   static Future<String> createOrder(String email, List<WooOrderLineItem> orderLineItems, {
     String? customerId, WooBilling? billingAddress, WooShipping? shippingAddress, WooOrderStatus orderStatus = WooOrderStatus.processing}) async {
+    if (orderLineItems.isEmpty) return '';
 
     WooOrder newOrder = WooOrder(
       paymentMethod: WooPaymentMethod.bacs.name,
@@ -78,7 +127,7 @@ class WooOrdersAPI {
     try {
       final responseData = await _callWoo(path: '/orders', method: 'POST', body: newOrder.toJson());
 
-      if (responseData != null) {
+      if (responseData is Map && responseData['id'] != null) {
         AppConfig.logger.i('Order created successfully!');
         orderId = responseData['id'].toString();
       }
@@ -89,11 +138,13 @@ class WooOrdersAPI {
     return orderId;
   }
 
-  static Future<List<WooOrder>> getOrders({perPage = 25, page = 1, WooOrderStatus? status}) async {
+  static Future<List<WooOrder>> getOrders({int perPage = 25, int page = 1, WooOrderStatus? status}) async {
     AppConfig.logger.i('getOrders');
 
-    String path = '/orders?page=$page&per_page=$perPage';
-    if(status != null) path = '$path&status=${status.name}';
+    final safePage = page < 1 ? 1 : page;
+    final safePerPage = perPage.clamp(1, 100);
+    String path = '/orders?page=$safePage&per_page=$safePerPage';
+    if (status != null) path = '$path&status=${Uri.encodeComponent(status.name)}';
 
     List<WooOrder> wooOrders = [];
 
@@ -102,8 +153,10 @@ class WooOrdersAPI {
 
       if (data is List) {
         for (var json in data) {
-          WooOrder wooOrder = WooOrder.fromJson(json);
-          wooOrders.add(wooOrder);
+          if (json is Map) {
+            WooOrder wooOrder = WooOrder.fromJson(Map<String, dynamic>.from(json));
+            wooOrders.add(wooOrder);
+          }
         }
       }
     } catch (e, st) {
@@ -113,17 +166,30 @@ class WooOrdersAPI {
     return wooOrders;
   }
 
-  static Future<String> createSessionOrder(AppUser user, String itemName, int quantity,{bool isNupale = false}) async {
-    AppConfig.logger.d('Processing Nupale Session Order of $quantity for $itemName');
+  static Future<String> createSessionOrder(AppUser user, String itemName, int quantity, {bool isNupale = false}) async {
+    final trimmedName = itemName.trim();
+    if (trimmedName.isEmpty || quantity <= 0) return '';
+    AppConfig.logger.d('Processing Session Order of $quantity for $trimmedName');
 
     String orderId = '';
-    String variationId = isNupale ? await WooProductsAPI.getNupaleVariationId(itemName) :  await WooProductsAPI.getCaseteVariationId(itemName);
+    String variationId = isNupale
+        ? await WooProductsAPI.getNupaleVariationId(trimmedName)
+        : await WooProductsAPI.getCaseteVariationId(trimmedName);
 
-    if(variationId.isNotEmpty) {
+    final rawProductId = isNupale
+        ? AppProperties.getWooNupaleProdutId()
+        : AppProperties.getWooCaseteProdutId();
+    final parsedProductId = int.tryParse(rawProductId.trim());
+    final parsedVariationId = int.tryParse(variationId.trim());
+
+    if (parsedProductId != null &&
+        parsedProductId > 0 &&
+        parsedVariationId != null &&
+        parsedVariationId > 0) {
       List<WooOrderLineItem> lineItems = [
         WooOrderLineItem(
-          productId: int.parse(AppProperties.getWooNupaleProdutId()),
-          variationId: int.parse(variationId),
+          productId: parsedProductId,
+          variationId: parsedVariationId,
           quantity: quantity,
         )
       ];
@@ -138,11 +204,14 @@ class WooOrdersAPI {
           email: user.email,
           phone: user.phoneNumber);
 
-      orderId = await createOrder(user.email, lineItems, billingAddress: billingAddress, orderStatus: WooOrderStatus.nupaleSession);
-
+      orderId = await createOrder(
+        user.email,
+        lineItems,
+        billingAddress: billingAddress,
+        orderStatus: WooOrderStatus.nupaleSession,
+      );
     }
 
     return orderId;
   }
-
 }
